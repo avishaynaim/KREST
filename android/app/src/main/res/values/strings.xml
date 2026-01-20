@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Places Search</string>
+    <string name="title_activity_main">Places Search</string>
+    <string name="package_name">com.placesearch.smartalgo</string>
+    <string name="custom_url_scheme">com.placesearch.smartalgo</string>
+</resources>

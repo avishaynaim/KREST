@@ -1,0 +1,61 @@
+#!/data/data/com.termux/files/usr/bin/bash
+set -euo pipefail
+
+# === CONFIG ===
+MESSAGE="In"
+OPEN_WAIT="1.2"       # wait for Telegram to open
+SEND_BY_ENTER="1"     # 1=use Enter to send, 0=tap send button
+
+# === Resolve the bot/chat ===
+# Try username(s) first; if you have a numeric ID, set USE_ID=1 and put it in CHAT_ID.
+USE_ID="0"
+CHAT_ID=""            # e.g. 123456789 if using tg://user?id=
+CANDIDATES=("netzGate" "netzgate" "netzGateBot" "netzgatebot")
+
+# === Find a working Android input command ===
+INPUT_CMD=""
+if command -v input >/dev/null 2>&1; then
+  INPUT_CMD="input"
+elif command -v cmd >/dev/null 2>&1; then
+  # Some ROMs expose it as "cmd input ..."
+  INPUT_CMD="cmd input"
+elif [ -x /system/bin/input ]; then
+  INPUT_CMD="/system/bin/input"
+else
+  termux-toast -b red "Android 'input' binary not found"; echo "Error: Android 'input' binary not found"; exit 1
+fi
+
+# === Open Telegram to the bot/chat ===
+if [ "$USE_ID" = "1" ] && [ -n "$CHAT_ID" ]; then
+  am start -a android.intent.action.VIEW -d "tg://user?id=${CHAT_ID}" >/dev/null 2>&1 || true
+else
+  opened=0
+  for u in "${CANDIDATES[@]}"; do
+    am start -a android.intent.action.VIEW -d "tg://resolve?domain=${u}" >/dev/null 2>&1 || true
+    opened=1
+    break
+  done
+fi
+
+sleep "$OPEN_WAIT"
+
+# === Type the message ===
+# Escape % and spaces for Android input tool
+SAFE_TEXT="$(printf '%s' "$MESSAGE" | sed 's/%/%25/g; s/ /%s/g; s/[\t\r\n]//g')"
+# shellcheck disable=SC2086
+$INPUT_CMD text "$SAFE_TEXT"
+
+# === Send the message ===
+if [ "$SEND_BY_ENTER" = "1" ]; then
+  # shellcheck disable=SC2086
+  $INPUT_CMD keyevent 66   # ENTER
+else
+  SCR="$(wm size | tr -d '\r')"
+  RES="$(echo "$SCR" | grep -Eo '[0-9]+x[0-9]+' | head -n1)"
+  WIDTH="${RES%x*}"
+  HEIGHT="${RES#*x}"
+  X_TAP=$(( WIDTH - 64 ))
+  Y_TAP=$(( HEIGHT - 100 ))
+  # shellcheck disable=SC2086
+  $INPUT_CMD tap "$X_TAP" "$Y_TAP"
+fi

@@ -18,6 +18,9 @@
   "author": "",
   "license": "MIT",
   "dependencies": {
+    "@capacitor/android": "^5.7.0",
+    "@capacitor/cli": "^5.7.0",
+    "@capacitor/core": "^5.7.0",
     "@googlemaps/google-maps-services-js": "^3.4.0",
     "axios": "^1.13.2",
     "dotenv": "^16.4.5",

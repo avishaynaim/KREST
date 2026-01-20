@@ -1,0 +1,46 @@
+# Node modules
+node_modules/
+
+# Logs
+*.log
+server.log
+build.log
+apk-build.log
+sdk-install.log
+rebuild.log
+
+# Android build
+.gradle/
+.android/
+android-sdk/
+local.properties
+
+# Termux/System
+.bash_history
+.cache/
+.claude/
+.claude.json
+.claude.json.backup
+.config/
+.npm/
+.npmrc
+.ssh/
+.termux/
+.termux_authinfo
+storage/
+
+# Environment
+.env
+
+# Test files
+test-*.json
+test-*.js
+*-test.js
+diagnose-*.md
+
+# Temporary files
+*.tmp
+*.swp
+*.swo
+nohup.out
+*.keystore
