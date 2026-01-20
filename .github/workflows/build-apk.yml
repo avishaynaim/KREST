@@ -66,8 +66,8 @@ jobs:
       if: github.ref == 'refs/heads/master'
       uses: softprops/action-gh-release@v2
       with:
-        tag_name: v1.5.0-webview
-        name: Places Search APK v1.5.0
+        tag_name: v1.6.0-embedded
+        name: Places Search APK v1.6.0 (Embedded Server)
         files: android/app/build/outputs/apk/debug/app-debug.apk
         draft: false
         prerelease: false
