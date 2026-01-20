@@ -1,5 +1,7 @@
 import { googleMapsClient, apiKey } from './placesClient.js';
 import { config } from './config.js';
+import { appendFileSync, writeFileSync } from 'fs';
+import { join } from 'path';
 
 /**
  * Calculates distance between two coordinates using Haversine formula
@@ -135,6 +137,8 @@ export async function getPlaceDetails(placeId, timeout = 10000) {
       timeout,
     });
 
+    // No logging for place details - only log the initial places from nearby search
+
     if (response.data.status === 'OK') {
       return response.data.result;
     }
@@ -198,9 +202,10 @@ export function formatPlace(place, searchLat, searchLng) {
  * @param {number} params.minReviews - Minimum review count filter (default: 20)
  * @param {string} params.type - Place type: "restaurant", "cafe", or undefined for both (default: both)
  * @param {boolean} params.closedSaturday - Filter for places closed on Saturday (default: true)
+ * @param {boolean} params.opennow - Filter for places open now (optional)
  * @returns {Promise<Array>} Filtered and sorted places
  */
-export async function searchPlaces({ latitude, longitude, radius, minRating, minReviews, type, closedSaturday = true }) {
+export async function searchPlaces({ latitude, longitude, radius, minRating, minReviews, type, closedSaturday = true, opennow }) {
   // Apply defaults
   const searchRadius = radius || config.defaultRadius;
   const minRatingFilter = minRating !== undefined ? minRating : config.defaultMinRating;
@@ -214,7 +219,23 @@ export async function searchPlaces({ latitude, longitude, radius, minRating, min
   console.log(`Min Reviews: ${minReviewsFilter}`);
   console.log(`Type: ${type || 'both'}`);
   console.log(`Filter Closed Saturday: ${filterClosedSaturday}`);
+  console.log(`Open Now: ${opennow !== undefined ? opennow : 'not set'}`);
   console.log('========================\n');
+
+  // Clear log file at start of search
+  const logPath = join(process.cwd(), 'google-api-debug.log');
+  try {
+    const header = `SEARCH STARTED: ${new Date().toISOString()}\n` +
+      `Location: ${latitude}, ${longitude}\n` +
+      `Radius: ${searchRadius}km\n` +
+      `Type: ${type || 'both'}\n` +
+      `Open Now: ${opennow !== undefined ? opennow : 'not set'}\n` +
+      `Filter Closed Saturday: ${filterClosedSaturday}\n` +
+      `${'='.repeat(80)}\n\n`;
+    writeFileSync(logPath, header);
+  } catch (err) {
+    console.error('Failed to clear log file:', err.message);
+  }
 
   // Validate radius
   if (searchRadius > config.maxRadius) {
@@ -238,19 +259,27 @@ export async function searchPlaces({ latitude, longitude, radius, minRating, min
   try {
     // Search for each place type separately with pagination
     let allPlaces = [];
-    const maxPages = 3; // Google API limit: max 3 pages (60 places) per type
+
+    // GOOGLE PLACES API PAGINATION:
+    // - Each request returns max 20 results
+    // - next_page_token allows fetching more results
+    // - Must wait 2-3 seconds between page requests (or get INVALID_REQUEST)
+    // - Tokens are search-specific, short-lived, one-time use only
+    // - Google typically limits to ~60 results (3 pages) but we'll fetch ALL available
 
     for (const placeType of placeTypes) {
       let nextPageToken = null;
       let pageCount = 0;
 
       console.log(`\n--- Searching for type: ${placeType} ---`);
+      console.log(`📄 Will fetch ALL pages until Google stops providing next_page_token`);
 
       do {
-        // Add delay before fetching next page (required by Google API)
+        // CRITICAL: Must wait 2-3 seconds before using next_page_token
+        // Calling immediately → INVALID_REQUEST error
         if (nextPageToken) {
-          console.log(`Waiting 3 seconds before fetching next page...`);
-          await new Promise(resolve => setTimeout(resolve, 3000)); // 3 second delay (Google requires 2-3 seconds)
+          console.log(`⏱️  Waiting 3 seconds before fetching next page (Google requirement)...`);
+          await new Promise(resolve => setTimeout(resolve, 3000));
         }
 
         const requestParams = {
@@ -258,37 +287,80 @@ export async function searchPlaces({ latitude, longitude, radius, minRating, min
           radius: radiusMeters,
           type: placeType,
           language: 'he',
-          key: '***hidden***',
+          key: apiKey,
           ...(nextPageToken && { pagetoken: nextPageToken }),
+          ...(opennow !== undefined && { opennow: opennow }),
         };
 
-        console.log(`\nGoogle API Request (${placeType} page ${pageCount + 1}):`);
-        console.log(JSON.stringify(requestParams, null, 2));
+        console.log(`\n>>> GOOGLE PLACES NEARBY API REQUEST (${placeType} page ${pageCount + 1}) <<<`);
+        console.log(`  ALL PARAMETERS SENT TO GOOGLE:`);
+        const paramsForLog = { ...requestParams, key: '***hidden***' };
+        console.log(JSON.stringify(paramsForLog, null, 2));
+
+        // Also write request params to log file
+        try {
+          const requestLog = `REQUEST (${placeType} page ${pageCount + 1}):\n${JSON.stringify(paramsForLog, null, 2)}\n\n`;
+          appendFileSync(logPath, requestLog);
+        } catch (err) {
+          console.error('Failed to write request to log file:', err.message);
+        }
 
         const response = await googleMapsClient.placesNearby({
-          params: {
-            location: { lat: latitude, lng: longitude },
-            radius: radiusMeters,
-            type: placeType,
-            language: 'he',
-            key: apiKey,
-            ...(nextPageToken && { pagetoken: nextPageToken }),
-          },
+          params: requestParams,
           timeout: 10000, // 10-second timeout
         });
 
+        // Console: Log response status only
+        console.log(`  <<< Response status: ${response.data.status} >>>`);
+        console.log(`  <<< Results count: ${response.data.results?.length || 0} >>>`);
+
+        // File: Log only place names and ranks
+        const places = response.data.results || [];
+        try {
+          const logPath = join(process.cwd(), 'google-api-debug.log');
+          places.forEach((place, index) => {
+            const rank = allPlaces.length + index + 1;
+            const rating = place.rating || 'N/A';
+            const reviews = place.user_ratings_total || 0;
+            const logLine = `${rank}\t${rating}\t${reviews}\t${place.name}\n`;
+            appendFileSync(logPath, logLine);
+          });
+
+          // Log next_page_token info after each page
+          const tokenInfo = `\nRESPONSE (${placeType} page ${pageCount + 1}):\n` +
+            `  Status: ${response.data.status}\n` +
+            `  Results this page: ${places.length}\n` +
+            `  next_page_token exists: ${!!response.data.next_page_token}\n` +
+            `  next_page_token value: ${response.data.next_page_token || 'NONE'}\n\n`;
+          appendFileSync(logPath, tokenInfo);
+        } catch (err) {
+          console.error('Failed to write to log file:', err.message);
+        }
+
         if (response.data.status !== 'OK' && response.data.status !== 'ZERO_RESULTS') {
+          console.error(`  ERROR: ${response.data.status} - ${response.data.error_message || 'No error message'}`);
           throw new Error(`Places search failed: ${response.data.status}`);
         }
 
-        const places = response.data.results || [];
-        allPlaces = allPlaces.concat(places);
+        const resultsThisPage = response.data.results || [];
+        allPlaces = allPlaces.concat(resultsThisPage);
         nextPageToken = response.data.next_page_token;
         pageCount++;
 
-        console.log(`Fetched ${placeType} page ${pageCount}: ${places.length} places (total: ${allPlaces.length})`);
+        console.log(`  ✓ Fetched ${resultsThisPage.length} places`);
+        console.log(`  📊 Total accumulated: ${allPlaces.length} places`);
+        console.log(`  🔗 next_page_token exists: ${!!nextPageToken}`);
 
-      } while (nextPageToken && pageCount < maxPages);
+        if (!nextPageToken) {
+          console.log(`  ✅ PAGINATION COMPLETE - Google has no more results`);
+        } else {
+          console.log(`  ➡️  Continuing to next page...`);
+        }
+
+      } while (nextPageToken); // Keep going until Google stops providing next_page_token
+
+      const typeCount = allPlaces.filter(p => p.types?.includes(placeType)).length;
+      console.log(`\n>>> ✅ Completed ${placeType}: ${typeCount} places across ${pageCount} page(s)`);
     }
 
     if (allPlaces.length === 0) {
@@ -304,19 +376,34 @@ export async function searchPlaces({ latitude, longitude, radius, minRating, min
     });
     const places = Array.from(uniquePlacesMap.values());
 
-    console.log(`Found ${allPlaces.length} total places (${places.length} unique), fetching details...`);
+    console.log(`\n=== FETCHING PLACE DETAILS ===`);
+    console.log(`Found ${allPlaces.length} total places (${places.length} unique)`);
+    console.log(`Fetching details for ${places.length} places...`);
 
     // Fetch details for each place to get opening hours
     const placesWithDetails = [];
+    let detailsFailed = 0;
 
-    for (const place of places) {
-      const details = await getPlaceDetails(place.place_id);
-      if (details) {
-        placesWithDetails.push(details);
+    for (let i = 0; i < places.length; i++) {
+      const place = places[i];
+      try {
+        if (i % 10 === 0) {
+          console.log(`  Progress: ${i}/${places.length} details fetched...`);
+        }
+        const details = await getPlaceDetails(place.place_id);
+        if (details) {
+          placesWithDetails.push(details);
+        } else {
+          detailsFailed++;
+        }
+      } catch (error) {
+        console.error(`  Failed to get details for ${place.name}: ${error.message}`);
+        detailsFailed++;
       }
     }
 
-    console.log(`Fetched details for ${placesWithDetails.length} places`);
+    console.log(`✓ Successfully fetched details for ${placesWithDetails.length} places`);
+    console.log(`✗ Failed to fetch details for ${detailsFailed} places`);
 
     console.log('\n=== FILTERING PLACES ===');
 
@@ -393,10 +480,9 @@ export async function searchPlaces({ latitude, longitude, radius, minRating, min
       return b.reviewCount - a.reviewCount;
     });
 
-    // Limit to top 50 results
-    const topPlaces = formattedPlaces.slice(0, 50);
+    console.log(`Returning ${formattedPlaces.length} places after sorting`);
 
-    return topPlaces;
+    return formattedPlaces;
   } catch (error) {
     // Re-throw specific errors
     if (error.message.includes('Radius cannot exceed')) {

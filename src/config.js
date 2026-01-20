@@ -24,6 +24,6 @@ export const config = {
   // Search defaults
   defaultRadius: 15, // kilometers
   maxRadius: 50, // kilometers
-  defaultMinRating: 2.5, // lowered to get more results
-  defaultMinReviews: 1, // lowered to get more results
+  defaultMinRating: 4.5, // minimum 4.5 stars
+  defaultMinReviews: 100, // minimum 100 reviews required
 };

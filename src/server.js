@@ -7,6 +7,7 @@ import { processLocation } from './locationService.js';
 import { searchPlaces } from './placesSearchService.js';
 import { validateQueryParameters } from './validation.js';
 import { rateLimitMiddleware, startCleanupSchedule } from './rateLimiter.js';
+import { adaptiveTilingSearch, convertNewPlaceToOldFormat } from './adaptiveTilingSearch.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -22,6 +23,183 @@ app.use(express.static(join(__dirname, '..', 'public')));
 // Health check endpoint (no rate limiting)
 app.get('/health', (req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
+});
+
+// NEW: Adaptive Tiling Search endpoint (uses Google Places API New)
+app.get('/api/places/adaptive', rateLimitMiddleware, async (req, res) => {
+  try {
+    // Validate parameters
+    const validation = validateQueryParameters(req.query);
+
+    if (!validation.valid) {
+      return res.status(400).json({
+        success: false,
+        error: 'INVALID_PARAMETERS',
+        message: validation.errors.join('; '),
+        errors: validation.errors,
+      });
+    }
+
+    const params = validation.params;
+
+    // Process location
+    const location = await processLocation({
+      city: params.city,
+      latitude: params.latitude,
+      longitude: params.longitude,
+    });
+
+    // Determine place types for New API
+    // Search each type SEPARATELY to maximize results (like old API)
+    const typeGroups = [];
+    if (!params.type || params.type === 'both') {
+      typeGroups.push(['restaurant']);
+      typeGroups.push(['cafe', 'coffee_shop']);
+    } else if (params.type === 'restaurant') {
+      typeGroups.push(['restaurant']);
+    } else if (params.type === 'cafe') {
+      typeGroups.push(['cafe', 'coffee_shop']);
+    }
+
+    // Get radius in meters
+    const radiusMeters = (params.radius || config.defaultRadius) * 1000;
+
+    console.log('\n🚀 Starting ADAPTIVE TILING SEARCH...');
+    console.log(`📋 Will search ${typeGroups.length} type group(s) separately`);
+
+    // Execute adaptive tiling search for EACH type group separately
+    const allResults = [];
+    const allMetrics = {
+      tilesProcessed: 0,
+      apiCalls: 0,
+      uniquePlaces: 0,
+      duplicateHits: 0,
+      truncatedTiles: 0,
+      completeTiles: 0,
+      maxDepthReached: 0,
+      minRadiusReached: 0,
+      budgetExhausted: false,
+    };
+
+    for (let i = 0; i < typeGroups.length; i++) {
+      const types = typeGroups[i];
+      console.log(`\n🔍 Searching type group ${i + 1}/${typeGroups.length}: ${types.join(', ')}`);
+
+      const result = await adaptiveTilingSearch(
+        location.latitude,
+        location.longitude,
+        radiusMeters,
+        types,
+        config.googlePlacesApiKey
+      );
+
+      allResults.push(...result.places);
+
+      // Accumulate metrics
+      allMetrics.tilesProcessed += result.metrics.tilesProcessed;
+      allMetrics.apiCalls += result.metrics.apiCalls;
+      allMetrics.uniquePlaces += result.metrics.uniquePlaces;
+      allMetrics.duplicateHits += result.metrics.duplicateHits;
+      allMetrics.truncatedTiles += result.metrics.truncatedTiles;
+      allMetrics.completeTiles += result.metrics.completeTiles;
+      allMetrics.maxDepthReached += result.metrics.maxDepthReached;
+      allMetrics.minRadiusReached += result.metrics.minRadiusReached;
+      allMetrics.budgetExhausted = allMetrics.budgetExhausted || result.metrics.budgetExhausted;
+    }
+
+    // Deduplicate across type groups
+    const seenIds = new Map();
+    const deduplicatedResults = [];
+    for (const place of allResults) {
+      if (!seenIds.has(place.id)) {
+        seenIds.set(place.id, true);
+        deduplicatedResults.push(place);
+      } else {
+        allMetrics.duplicateHits++;
+      }
+    }
+
+    allMetrics.uniquePlaces = deduplicatedResults.length;
+
+    console.log(`\n✅ All type groups complete: ${deduplicatedResults.length} unique places found`);
+
+    const result = { places: deduplicatedResults, metrics: allMetrics };
+
+    // Convert to old format for compatibility
+    const formattedPlaces = result.places.map(place =>
+      convertNewPlaceToOldFormat(place, location.latitude, location.longitude)
+    );
+
+    // Sort ALL places by rating (highest first), then by review count
+    formattedPlaces.sort((a, b) => {
+      if (b.rating !== a.rating) {
+        return b.rating - a.rating;
+      }
+      return b.reviewCount - a.reviewCount;
+    });
+
+    // Print ALL results nicely to console (before filtering)
+    console.log('\n' + '═'.repeat(100));
+    console.log('📊 ALL SEARCH RESULTS - ORDERED BY RATING (BEFORE CLIENT FILTERS)');
+    console.log('═'.repeat(100));
+    console.log(`Total Found: ${formattedPlaces.length}`);
+    console.log('─'.repeat(100));
+    console.log(` # │ Rating │ Reviews │ Place Name`);
+    console.log('─'.repeat(100));
+
+    formattedPlaces.forEach((place, index) => {
+      const rank = (index + 1).toString().padStart(3, ' ');
+      const rating = place.rating.toFixed(1);
+      const reviews = place.reviewCount.toString().padStart(6, ' ');
+      const name = place.name;
+      console.log(`${rank} │  ${rating}  │ ${reviews} │ ${name}`);
+    });
+
+    console.log('═'.repeat(100) + '\n');
+
+    // Apply client-side filters (rating, reviews)
+    const minRatingFilter = params.minRating !== undefined ? params.minRating : config.defaultMinRating;
+    const minReviewsFilter = params.minReviews !== undefined ? params.minReviews : config.defaultMinReviews;
+
+    const filteredPlaces = formattedPlaces.filter(place => {
+      if (place.rating < minRatingFilter) return false;
+      if (place.reviewCount < minReviewsFilter) return false;
+      return true;
+    });
+
+    // Return results
+    const allTypes = typeGroups.flat(); // Flatten typeGroups array
+
+    res.json({
+      success: true,
+      method: 'adaptive_tiling',
+      algorithm: 'SMART_ALGO_RANGE_v1.3',
+      algorithmDescription: 'Full coverage + hours + Google Maps links',
+      location: {
+        latitude: location.latitude,
+        longitude: location.longitude,
+        formattedAddress: location.formattedAddress,
+      },
+      filters: {
+        radius: radiusMeters / 1000,
+        minRating: minRatingFilter,
+        minReviews: minReviewsFilter,
+        types: allTypes,
+      },
+      metrics: result.metrics,
+      totalFound: result.places.length,
+      afterFilters: filteredPlaces.length,
+      places: filteredPlaces,
+    });
+  } catch (error) {
+    console.error('Adaptive Tiling API Error:', error);
+
+    res.status(500).json({
+      success: false,
+      error: 'ADAPTIVE_SEARCH_ERROR',
+      message: error.message,
+    });
+  }
 });
 
 // Main search endpoint with comprehensive validation (primary endpoint)
@@ -59,7 +237,27 @@ app.get('/api/places/search', rateLimitMiddleware, async (req, res) => {
       minReviews: params.minReviews,
       type: params.type,
       closedSaturday: closedSaturday,
+      opennow: params.opennow,
     });
+
+    // Print results nicely to console
+    console.log('\n' + '═'.repeat(100));
+    console.log('📊 SEARCH RESULTS - ORDERED BY RATING');
+    console.log('═'.repeat(100));
+    console.log(`Total Found: ${places.length}`);
+    console.log('─'.repeat(100));
+    console.log(` # │ Rating │ Reviews │ Place Name`);
+    console.log('─'.repeat(100));
+
+    places.forEach((place, index) => {
+      const rank = (index + 1).toString().padStart(3, ' ');
+      const rating = place.rating.toFixed(1);
+      const reviews = place.reviewCount.toString().padStart(6, ' ');
+      const name = place.name;
+      console.log(`${rank} │  ${rating}  │ ${reviews} │ ${name}`);
+    });
+
+    console.log('═'.repeat(100) + '\n');
 
     // Return results with metadata
     res.json({
@@ -150,6 +348,25 @@ app.get('/api/places', rateLimitMiddleware, async (req, res) => {
       minRating: minRat,
       minReviews: minRev,
     });
+
+    // Print results nicely to console
+    console.log('\n' + '═'.repeat(100));
+    console.log('📊 SEARCH RESULTS - ORDERED BY RATING');
+    console.log('═'.repeat(100));
+    console.log(`Total Found: ${places.length}`);
+    console.log('─'.repeat(100));
+    console.log(` # │ Rating │ Reviews │ Place Name`);
+    console.log('─'.repeat(100));
+
+    places.forEach((place, index) => {
+      const rank = (index + 1).toString().padStart(3, ' ');
+      const rating = place.rating.toFixed(1);
+      const reviews = place.reviewCount.toString().padStart(6, ' ');
+      const name = place.name;
+      console.log(`${rank} │  ${rating}  │ ${reviews} │ ${name}`);
+    });
+
+    console.log('═'.repeat(100) + '\n');
 
     // Return results
     res.json({

@@ -115,6 +115,41 @@
             transform: none;
         }
 
+        .settings-button {
+            border: none;
+            padding: 12px 24px;
+            border-radius: 8px;
+            font-size: 1em;
+            font-weight: 500;
+            cursor: pointer;
+            transition: transform 0.2s, box-shadow 0.2s;
+            flex: 1;
+        }
+
+        .save-button {
+            background: linear-gradient(135deg, #4caf50 0%, #45a049 100%);
+            color: white;
+        }
+
+        .save-button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 20px rgba(76, 175, 80, 0.4);
+        }
+
+        .clear-button {
+            background: linear-gradient(135deg, #ff9800 0%, #f57c00 100%);
+            color: white;
+        }
+
+        .clear-button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 20px rgba(255, 152, 0, 0.4);
+        }
+
+        .settings-button:active {
+            transform: translateY(0);
+        }
+
         .location-button {
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             color: white;
@@ -644,15 +679,15 @@
         }
 
         .hours-list {
-            display: none;
+            display: block;
             margin-top: 10px;
             padding: 10px;
             background: #f9f9f9;
             border-radius: 8px;
         }
 
-        .hours-list.visible {
-            display: block;
+        .hours-list.hidden {
+            display: none;
         }
 
         .hours-day {
@@ -806,6 +841,11 @@
         <div class="header">
             <h1>🔍 מערכת חיפוש מסעדות</h1>
             <p>מצא מסעדות ובתי קפה סגורים בשבת</p>
+            <div style="margin-top: 10px;">
+                <span style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 6px 16px; border-radius: 20px; font-size: 0.85em; font-weight: 600; display: inline-block;">
+                    🎯 SMART ALGO RANGE v1.3 - All Features Working
+                </span>
+            </div>
         </div>
 
         <div class="search-card">
@@ -823,14 +863,36 @@
                     <div class="form-group">
                         <label for="radius">📏 רדיוס חיפוש (ק"מ)</label>
                         <select id="radius">
-                            <option value="5">5 ק"מ</option>
+                            <option value="1">1 ק"מ</option>
+                            <option value="2">2 ק"מ</option>
+                            <option value="3">3 ק"מ</option>
+                            <option value="4">4 ק"מ</option>
+                            <option value="5" selected>5 ק"מ</option>
+                            <option value="6">6 ק"מ</option>
+                            <option value="7">7 ק"מ</option>
+                            <option value="8">8 ק"מ</option>
+                            <option value="9">9 ק"מ</option>
                             <option value="10">10 ק"מ</option>
-                            <option value="15" selected>15 ק"מ</option>
+                            <option value="11">11 ק"מ</option>
+                            <option value="12">12 ק"מ</option>
+                            <option value="13">13 ק"מ</option>
+                            <option value="14">14 ק"מ</option>
+                            <option value="15">15 ק"מ</option>
+                            <option value="16">16 ק"מ</option>
+                            <option value="17">17 ק"מ</option>
+                            <option value="18">18 ק"מ</option>
+                            <option value="19">19 ק"מ</option>
                             <option value="20">20 ק"מ</option>
+                            <option value="21">21 ק"מ</option>
+                            <option value="22">22 ק"מ</option>
+                            <option value="23">23 ק"מ</option>
+                            <option value="24">24 ק"מ</option>
                             <option value="25">25 ק"מ</option>
+                            <option value="26">26 ק"מ</option>
+                            <option value="27">27 ק"מ</option>
+                            <option value="28">28 ק"מ</option>
+                            <option value="29">29 ק"מ</option>
                             <option value="30">30 ק"מ</option>
-                            <option value="40">40 ק"מ</option>
-                            <option value="50">50 ק"מ</option>
                         </select>
                     </div>
                 </div>
@@ -850,7 +912,7 @@
                     </div>
                     <div class="form-group">
                         <label for="reviews">💬 ביקורות מינימליות</label>
-                        <input type="number" id="reviews" value="10" min="1">
+                        <input type="number" id="reviews" value="100" min="1">
                     </div>
                     <div class="form-group">
                         <label for="type">🍽️ סוג</label>
@@ -878,6 +940,11 @@
                 </div>
 
                 <button type="submit" class="search-button">🔍 חפש מקומות</button>
+
+                <div class="form-row" style="margin-top: 15px; gap: 10px;">
+                    <button type="button" class="settings-button save-button" onclick="saveSettings()">💾 שמור הגדרות</button>
+                    <button type="button" class="settings-button clear-button" onclick="clearToDefault()">🔄 איפוס לברירת מחדל</button>
+                </div>
             </form>
         </div>
 
@@ -1162,7 +1229,8 @@
                     minRating: rating,
                     minReviews: reviews,
                     type: type,
-                    closedSaturday: false // Always fetch all places, filter on client
+                    closedSaturday: false, // Always fetch all places, filter on client
+                    opennow: openNow // Send opennow to Google API
                 });
 
                 if (currentLocation) {
@@ -1180,8 +1248,8 @@
 
                 let response, data;
                 try {
-                    // Make API request with timeout
-                    response = await fetch(`/api/places/search?${params}`, {
+                    // Make API request with timeout - USING ADAPTIVE TILING (200-500+ results!)
+                    response = await fetch(`/api/places/adaptive?${params}`, {
                         signal: controller.signal
                     });
                     clearTimeout(timeoutId);
@@ -1466,7 +1534,7 @@
                             </div>
 
                             <div class="hours-section">
-                                <div class="hours-toggle" onclick="toggleHours(this)">
+                                <div class="hours-toggle expanded" onclick="toggleHours(this)">
                                     <span class="hours-toggle-icon">▼</span>
                                     <span>שעות פתיחה</span>
                                 </div>
@@ -1526,8 +1594,116 @@
             const hoursList = toggle.nextElementSibling;
 
             toggle.classList.toggle('expanded');
-            hoursList.classList.toggle('visible');
+            hoursList.classList.toggle('hidden');
         }
+
+        // Save all settings to localStorage
+        function saveSettings() {
+            const settings = {
+                radius: document.getElementById('radius').value,
+                rating: document.getElementById('rating').value,
+                reviews: document.getElementById('reviews').value,
+                type: document.getElementById('type').value,
+                limit: document.getElementById('limit').value,
+                closedSaturday: document.getElementById('closedSaturday').checked,
+                openNow: document.getElementById('openNow').checked,
+                cityValue: cityInput.value,
+                currentLocation: currentLocation
+            };
+
+            localStorage.setItem('placeSearchSettings', JSON.stringify(settings));
+
+            // Show success message
+            const cityContainer = document.querySelector('.city-input-container');
+            const successMsg = document.createElement('div');
+            successMsg.textContent = '✓ הגדרות נשמרו בהצלחה!';
+            successMsg.style.color = '#4caf50';
+            successMsg.style.fontSize = '0.9em';
+            successMsg.style.marginTop = '5px';
+            successMsg.style.fontWeight = '500';
+            cityContainer.appendChild(successMsg);
+
+            setTimeout(() => {
+                successMsg.remove();
+            }, 3000);
+        }
+
+        // Load settings from localStorage
+        function loadSettings() {
+            const savedSettings = localStorage.getItem('placeSearchSettings');
+
+            if (savedSettings) {
+                try {
+                    const settings = JSON.parse(savedSettings);
+
+                    // Restore all form values
+                    if (settings.radius) document.getElementById('radius').value = settings.radius;
+                    if (settings.rating) document.getElementById('rating').value = settings.rating;
+                    if (settings.reviews) document.getElementById('reviews').value = settings.reviews;
+                    if (settings.type) document.getElementById('type').value = settings.type;
+                    if (settings.limit) document.getElementById('limit').value = settings.limit;
+                    if (settings.closedSaturday !== undefined) document.getElementById('closedSaturday').checked = settings.closedSaturday;
+                    if (settings.openNow !== undefined) document.getElementById('openNow').checked = settings.openNow;
+
+                    // Restore location
+                    if (settings.cityValue) {
+                        cityInput.value = settings.cityValue;
+                    }
+                    if (settings.currentLocation) {
+                        currentLocation = settings.currentLocation;
+                        if (currentLocation.latitude && currentLocation.longitude) {
+                            cityInput.placeholder = `מיקום ממפה: ${currentLocation.latitude.toFixed(4)}, ${currentLocation.longitude.toFixed(4)}`;
+                            locationStatus.style.display = 'block';
+                            locationStatus.textContent = `✓ נבחר ממפה: ${currentLocation.latitude.toFixed(4)}, ${currentLocation.longitude.toFixed(4)}`;
+                            locationStatus.style.color = '#4caf50';
+                        }
+                    }
+                } catch (e) {
+                    console.error('Error loading settings:', e);
+                }
+            }
+        }
+
+        // Clear to default settings
+        function clearToDefault() {
+            // Clear localStorage
+            localStorage.removeItem('placeSearchSettings');
+
+            // Reset to defaults
+            document.getElementById('radius').value = '5';
+            document.getElementById('rating').value = '4.5';
+            document.getElementById('reviews').value = '100';
+            document.getElementById('type').value = 'both';
+            document.getElementById('limit').value = '50';
+            document.getElementById('closedSaturday').checked = true;
+            document.getElementById('openNow').checked = true;
+
+            // Clear location
+            cityInput.value = '';
+            cityInput.placeholder = 'לדוגמה: רחובות, תל אביב, ירושלים';
+            currentLocation = null;
+            locationStatus.style.display = 'none';
+            locationStatus.textContent = '';
+
+            // Show success message
+            const cityContainer = document.querySelector('.city-input-container');
+            const successMsg = document.createElement('div');
+            successMsg.textContent = '✓ הגדרות אופסו לברירת מחדל!';
+            successMsg.style.color = '#ff9800';
+            successMsg.style.fontSize = '0.9em';
+            successMsg.style.marginTop = '5px';
+            successMsg.style.fontWeight = '500';
+            cityContainer.appendChild(successMsg);
+
+            setTimeout(() => {
+                successMsg.remove();
+            }, 3000);
+        }
+
+        // Load settings on page load
+        window.addEventListener('DOMContentLoaded', () => {
+            loadSettings();
+        });
     </script>
 </body>
 </html>

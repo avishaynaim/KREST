@@ -95,6 +95,31 @@ export function validateType(type) {
 }
 
 /**
+ * Validates opennow parameter
+ * @param {any} opennow - Open now value to validate
+ * @returns {{ valid: boolean, value?: boolean, error?: string }}
+ */
+export function validateOpenNow(opennow) {
+  if (opennow === undefined || opennow === null || opennow === '') {
+    return { valid: true, value: undefined }; // Will use default
+  }
+
+  // Handle string boolean values
+  if (typeof opennow === 'string') {
+    const normalized = opennow.toLowerCase().trim();
+    if (normalized === 'true') return { valid: true, value: true };
+    if (normalized === 'false') return { valid: true, value: false };
+  }
+
+  // Handle actual boolean
+  if (typeof opennow === 'boolean') {
+    return { valid: true, value: opennow };
+  }
+
+  return { valid: false, error: 'opennow must be a boolean value (true or false)' };
+}
+
+/**
  * Validates location parameters
  * @param {string} city - City name
  * @param {any} latitude - Latitude value
@@ -186,6 +211,14 @@ export function validateQueryParameters(query) {
     errors.push(typeValidation.error);
   } else if (typeValidation.value !== undefined) {
     params.type = typeValidation.value;
+  }
+
+  // Validate opennow
+  const openNowValidation = validateOpenNow(query.opennow);
+  if (!openNowValidation.valid) {
+    errors.push(openNowValidation.error);
+  } else if (openNowValidation.value !== undefined) {
+    params.opennow = openNowValidation.value;
   }
 
   if (errors.length > 0) {

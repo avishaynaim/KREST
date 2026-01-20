@@ -33,6 +33,12 @@ export async function geocodeCity(cityName) {
       },
     });
 
+    // Console: Log request details only
+    console.log('\n>>> GOOGLE GEOCODING API REQUEST <<<');
+    console.log(`City: ${cityName}`);
+    console.log(`Language: he`);
+    console.log(`Status: ${response.data.status}`);
+
     if (response.data.status === 'OK' && response.data.results.length > 0) {
       const result = response.data.results[0];
       return {
