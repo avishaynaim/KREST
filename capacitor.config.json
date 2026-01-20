@@ -4,23 +4,9 @@
   "webDir": "public",
   "server": {
     "androidScheme": "http",
-    "hostname": "localhost",
-    "iosScheme": "capacitor"
-  },
-  "android": {
-    "buildOptions": {
-      "keystorePath": "android/app/release.keystore",
-      "keystoreAlias": "places-search",
-      "releaseType": "APK"
-    }
+    "hostname": "localhost"
   },
   "plugins": {
-    "SplashScreen": {
-      "launchShowDuration": 2000,
-      "backgroundColor": "#667eea",
-      "showSpinner": true,
-      "spinnerColor": "#ffffff"
-    },
     "CapacitorNodeJS": {
       "nodeDir": "nodejs"
     }
