@@ -39,13 +39,14 @@ jobs:
         cp public/icons/icon-template.svg public/icons/icon-192x192.png || true
         cp public/icons/icon-template.svg public/icons/icon-512x512.png || true
 
-    - name: Initialize Capacitor
+    - name: Clean Android platform
       run: |
-        npx cap sync
+        rm -rf android
+        npx cap add android
 
-    - name: Add Android platform
+    - name: Sync Capacitor
       run: |
-        npx cap add android || echo "Android platform already exists"
+        npx cap sync android
 
     - name: Grant execute permission for gradlew
       run: chmod +x android/gradlew
