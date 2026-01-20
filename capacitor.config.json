@@ -21,6 +21,10 @@
       "backgroundColor": "#667eea",
       "showSpinner": true,
       "spinnerColor": "#ffffff"
+    },
+    "NodejsMobile": {
+      "nodeDir": "nodejs-project",
+      "nodeStartScript": "main.js"
     }
   }
 }

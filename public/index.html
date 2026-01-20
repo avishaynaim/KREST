@@ -1264,7 +1264,8 @@
                 let response, data;
                 try {
                     // Make API request with timeout - USING ADAPTIVE TILING (200-500+ results!)
-                    response = await fetch(`/api/places/adaptive?${params}`, {
+                    const apiBaseUrl = getApiBaseUrl();
+                    response = await fetch(`${apiBaseUrl}/api/places/adaptive?${params}`, {
                         signal: controller.signal
                     });
                     clearTimeout(timeoutId);
@@ -1718,7 +1719,161 @@
         // Load settings on page load
         window.addEventListener('DOMContentLoaded', () => {
             loadSettings();
+            initializeNodejsMobileBridge();
         });
+
+        /**
+         * Get the correct API base URL based on environment
+         * In mobile (Android APK): uses localhost:3000
+         * In web: uses relative paths
+         */
+        function getApiBaseUrl() {
+            // If we're in a mobile app (detected by nodejs-mobile bridge)
+            if (typeof nodejs !== 'undefined' && nodejs) {
+                return 'http://localhost:3000';
+            }
+            // In web/desktop mode, use relative URL (served by same origin)
+            return '';
+        }
+
+        /**
+         * Initialize nodejs-mobile bridge for embedded server
+         * This handles communication between the WebView and embedded Node.js server
+         */
+        function initializeNodejsMobileBridge() {
+            // Check if running in nodejs-mobile environment
+            if (typeof nodejs === 'undefined' || !nodejs) {
+                console.log('[App] Running in web mode - nodejs-mobile bridge not available');
+                return;
+            }
+
+            console.log('[nodejs-mobile] Bridge detected - app is running as Android APK');
+
+            // Listen for messages from Node.js server
+            if (nodejs.channel && nodejs.channel.on) {
+                nodejs.channel.on('message', (msg) => {
+                    if (msg === 'server-ready') {
+                        console.log('[nodejs-mobile] Embedded server is ready!');
+                        onEmbeddedServerReady();
+                    } else {
+                        console.log('[nodejs-mobile] Message from server:', msg);
+                    }
+                });
+            }
+
+            // Start the embedded Node.js server
+            if (nodejs.start) {
+                console.log('[nodejs-mobile] Starting embedded Node.js server...');
+                try {
+                    nodejs.start('main.js', {
+                        // Optional: configure Node.js startup options
+                        // See nodejs-mobile documentation
+                    });
+                } catch (error) {
+                    console.error('[nodejs-mobile] Failed to start server:', error);
+                    showServerError('Failed to start embedded server');
+                }
+            }
+
+            // Set a timeout to show error if server doesn't start
+            setTimeout(() => {
+                if (!window.serverReady) {
+                    showServerError('Server startup timeout - please restart the app');
+                }
+            }, 15000); // 15 second timeout
+        }
+
+        /**
+         * Called when embedded server is ready
+         */
+        function onEmbeddedServerReady() {
+            window.serverReady = true;
+            console.log('[App] Embedded server ready - enabling search functionality');
+
+            // Get API key from localStorage
+            const apiKey = localStorage.getItem('googleApiKey');
+            if (!apiKey) {
+                console.log('[App] No API key found - user needs to enter it in settings');
+                showServerStatus('⚠️ הגדר מפתח API כדי להשתמש באפליקציה');
+                return;
+            }
+
+            // Send API key to embedded server
+            if (nodejs && nodejs.channel && nodejs.channel.send) {
+                console.log('[nodejs-mobile] Sending API key to server...');
+                nodejs.channel.send({
+                    type: 'config',
+                    apiKey: apiKey
+                });
+            }
+
+            // Hide loading indicator if shown
+            hideServerStatus();
+        }
+
+        /**
+         * Show server status message to user
+         */
+        function showServerStatus(message) {
+            let statusDiv = document.getElementById('server-status');
+            if (!statusDiv) {
+                statusDiv = document.createElement('div');
+                statusDiv.id = 'server-status';
+                statusDiv.style.cssText = `
+                    position: fixed;
+                    top: 20px;
+                    left: 20px;
+                    right: 20px;
+                    padding: 15px 20px;
+                    background: #667eea;
+                    color: white;
+                    border-radius: 8px;
+                    z-index: 10000;
+                    text-align: center;
+                    font-weight: 500;
+                `;
+                document.body.appendChild(statusDiv);
+            }
+            statusDiv.textContent = message;
+            statusDiv.style.display = 'block';
+        }
+
+        /**
+         * Hide server status message
+         */
+        function hideServerStatus() {
+            const statusDiv = document.getElementById('server-status');
+            if (statusDiv) {
+                statusDiv.style.display = 'none';
+            }
+        }
+
+        /**
+         * Show error message to user
+         */
+        function showServerError(message) {
+            let errorDiv = document.getElementById('server-error');
+            if (!errorDiv) {
+                errorDiv = document.createElement('div');
+                errorDiv.id = 'server-error';
+                errorDiv.style.cssText = `
+                    position: fixed;
+                    top: 20px;
+                    left: 20px;
+                    right: 20px;
+                    padding: 15px 20px;
+                    background: #f44336;
+                    color: white;
+                    border-radius: 8px;
+                    z-index: 10000;
+                    text-align: center;
+                    font-weight: 500;
+                `;
+                document.body.appendChild(errorDiv);
+            }
+            errorDiv.textContent = message;
+            errorDiv.style.display = 'block';
+        }
 
         // Register Service Worker for PWA functionality
         if ('serviceWorker' in navigator) {

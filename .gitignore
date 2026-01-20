@@ -31,6 +31,10 @@ storage/
 
 # Environment
 .env
+nodejs-project/.env
+
+# nodejs-mobile
+nodejs-project/node_modules/
 
 # Test files
 test-*.json

@@ -425,6 +425,17 @@ const server = app.listen(config.port, () => {
 
   // Start rate limit cleanup schedule
   startCleanupSchedule();
+
+  // Notify nodejs-mobile bridge that server is ready (if running in mobile context)
+  try {
+    if (global.nodejs && global.nodejs.channel) {
+      global.nodejs.channel.send('server-ready');
+      console.log('[nodejs-mobile] Server ready notification sent to WebView\n');
+    }
+  } catch (err) {
+    // Bridge might not be available in development/non-mobile environment
+    console.log('[Development] nodejs-mobile bridge not available - running in desktop mode\n');
+  }
 });
 
 // Increase server timeout to 5 minutes (300 seconds) to handle multiple page requests
