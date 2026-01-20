@@ -24,8 +24,15 @@ jobs:
         java-version: '17'
         distribution: 'temurin'
 
-    - name: Install dependencies
+    - name: Install dependencies (without capacitor-nodejs)
       run: |
+        # Temporarily remove capacitor-nodejs from package.json
+        node -e "
+          const fs = require('fs');
+          const pkg = JSON.parse(fs.readFileSync('package.json'));
+          delete pkg.dependencies['capacitor-nodejs'];
+          fs.writeFileSync('package.json', JSON.stringify(pkg, null, 2));
+        "
         npm install
         npm install -g @capacitor/cli
 
@@ -50,16 +57,16 @@ jobs:
         echo "=== webDir (public) contents ===" && ls -la public/ || true
         echo "=== Debug complete ==="
 
-    - name: Temporarily remove nodejs plugin for cap add
+    - name: Remove nodejs plugin config for cap add
       run: |
-        npm uninstall capacitor-nodejs || true
-        # Also remove from capacitor config temporarily - use simpler approach
+        # Remove plugins from capacitor config
         node -e "
           const fs = require('fs');
           const c = JSON.parse(fs.readFileSync('capacitor.config.json'));
           delete c.plugins;
           fs.writeFileSync('capacitor.config.json', JSON.stringify(c, null, 2));
         "
+        echo "=== Capacitor config (plugins removed) ==="
         cat capacitor.config.json
 
     - name: Add Android platform
@@ -67,7 +74,7 @@ jobs:
         rm -rf android
         npx cap add android
 
-    - name: Reinstall nodejs plugin
+    - name: Install capacitor-nodejs plugin
       run: |
         npm install https://github.com/hampoelz/capacitor-nodejs/releases/download/v1.0.0-beta.9/capacitor-nodejs.tgz
         # Restore plugin config
@@ -77,6 +84,7 @@ jobs:
           c.plugins = { CapacitorNodeJS: { nodeDir: 'nodejs' } };
           fs.writeFileSync('capacitor.config.json', JSON.stringify(c, null, 2));
         "
+        echo "=== Capacitor config (with plugin) ==="
         cat capacitor.config.json
 
     - name: Sync Capacitor
