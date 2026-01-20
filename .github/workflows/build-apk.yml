@@ -33,12 +33,6 @@ jobs:
       run: |
         npm install @capacitor/core @capacitor/cli @capacitor/android
 
-    - name: Install Node.js server dependencies
-      run: |
-        cd nodejs-project
-        npm install --production
-        cd ..
-
     - name: Create icons directory
       run: |
         mkdir -p public/icons
@@ -48,14 +42,6 @@ jobs:
     - name: Initialize Capacitor
       run: |
         npx cap sync
-
-    - name: Add nodejs-mobile plugin
-      run: |
-        npm install nodejs-mobile-cordova || true
-
-    - name: Sync Capacitor with plugins
-      run: |
-        npx cap sync android
 
     - name: Add Android platform
       run: |
