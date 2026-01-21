@@ -1286,6 +1286,37 @@
             }
         });
 
+        // Convert 12-hour format (e.g., "9:00 AM – 5:00 PM") to 24-hour format (e.g., "09:00 – 17:00")
+        function convertTo24Hour(timeStr) {
+            if (!timeStr) return timeStr;
+
+            // Handle "Closed" or "סגור"
+            if (timeStr.toLowerCase().includes('closed') || timeStr.includes('סגור')) {
+                return timeStr;
+            }
+
+            // Handle "24 hours" or similar
+            if (timeStr.toLowerCase().includes('24 hour') || timeStr.includes('24 שעות')) {
+                return '24 שעות';
+            }
+
+            // Pattern to match times like "9:00 AM" or "11:30 PM"
+            const timePattern = /(\d{1,2}):(\d{2})\s*(AM|PM|am|pm)/g;
+
+            return timeStr.replace(timePattern, (match, hour, min, period) => {
+                let h = parseInt(hour);
+                const p = period.toUpperCase();
+
+                if (p === 'PM' && h !== 12) {
+                    h += 12;
+                } else if (p === 'AM' && h === 12) {
+                    h = 0;
+                }
+
+                return `${h.toString().padStart(2, '0')}:${min}`;
+            });
+        }
+
         function filterOpenNow(places) {
             const now = new Date();
             const dayOfWeek = now.getDay(); // 0=Sunday, 1=Monday, ..., 6=Saturday
@@ -1323,50 +1354,86 @@
                 const isClosedByKeyword = closedKeywords.some(keyword => lowerText.includes(keyword));
 
                 if (isClosedByKeyword) {
-                    return true; // Explicitly closed
+                    return true; // Explicitly closed on Saturday = INCLUDE (we want closed places)
                 }
 
                 // Check if 24 hours
                 const is24Hours = lowerText.includes('24 hours') || lowerText.includes('24 שעות') || lowerText.includes('open 24 hours');
                 if (is24Hours) {
-                    return false; // Open 24 hours = open during business hours
+                    return false; // Open 24 hours on Saturday = EXCLUDE
                 }
 
-                // Parse opening hours and check if open during business hours (8 AM - 5 PM)
-                const timePattern = /(\d{1,2}):(\d{2})\s*(am|pm)?[\s–-]+(\d{1,2}):(\d{2})\s*(am|pm)?/gi;
-                const matches = [...saturdayHours.matchAll(timePattern)];
+                // Parse opening hours - handle BOTH 12-hour (AM/PM) and 24-hour formats
+                // Pattern 1: 12-hour format "9:00 AM – 5:00 PM"
+                const timePattern12h = /(\d{1,2}):(\d{2})\s*(am|pm)[\s–\-]+(\d{1,2}):(\d{2})\s*(am|pm)/gi;
+                // Pattern 2: 24-hour format "09:00 – 17:00" or "9:00–17:00"
+                const timePattern24h = /(\d{1,2}):(\d{2})[\s–\-]+(\d{1,2}):(\d{2})(?!\s*(am|pm))/gi;
 
-                if (matches.length === 0) {
-                    return true; // No time pattern, assume closed
-                }
+                const matches12h = [...saturdayHours.matchAll(timePattern12h)];
+                const matches24h = [...saturdayHours.matchAll(timePattern24h)];
 
-                const businessStart = 8 * 60; // 8:00 AM in minutes
-                const businessEnd = 17 * 60;  // 5:00 PM in minutes
+                // Combine matches
+                const allTimeRanges = [];
 
-                for (const match of matches) {
+                // Process 12-hour matches
+                for (const match of matches12h) {
                     let openHour = parseInt(match[1]);
                     const openMin = parseInt(match[2]);
-                    const openPeriod = match[3]?.toLowerCase();
+                    const openPeriod = match[3].toLowerCase();
                     let closeHour = parseInt(match[4]);
                     const closeMin = parseInt(match[5]);
-                    const closePeriod = match[6]?.toLowerCase();
+                    const closePeriod = match[6].toLowerCase();
 
-                    // Convert to 24-hour format
+                    // Convert to 24-hour
                     if (openPeriod === 'pm' && openHour !== 12) openHour += 12;
                     if (openPeriod === 'am' && openHour === 12) openHour = 0;
                     if (closePeriod === 'pm' && closeHour !== 12) closeHour += 12;
                     if (closePeriod === 'am' && closeHour === 12) closeHour = 0;
 
-                    const openTime = openHour * 60 + openMin;
-                    const closeTime = closeHour * 60 + closeMin;
+                    allTimeRanges.push({
+                        openTime: openHour * 60 + openMin,
+                        closeTime: closeHour * 60 + closeMin
+                    });
+                }
 
-                    // Check if open during business hours
-                    if (openTime <= businessEnd && closeTime >= businessStart) {
-                        return false; // Open during business hours, exclude
+                // Process 24-hour matches
+                for (const match of matches24h) {
+                    const openHour = parseInt(match[1]);
+                    const openMin = parseInt(match[2]);
+                    const closeHour = parseInt(match[3]);
+                    const closeMin = parseInt(match[4]);
+
+                    allTimeRanges.push({
+                        openTime: openHour * 60 + openMin,
+                        closeTime: closeHour * 60 + closeMin
+                    });
+                }
+
+                if (allTimeRanges.length === 0) {
+                    return true; // No time pattern found, assume closed = INCLUDE
+                }
+
+                const businessStart = 8 * 60;  // 08:00 in minutes
+                const businessEnd = 17 * 60;   // 17:00 in minutes
+
+                for (const range of allTimeRanges) {
+                    const { openTime, closeTime } = range;
+
+                    // Handle overnight ranges (e.g., 22:00 - 02:00)
+                    if (closeTime < openTime) {
+                        // Overnight: check if business hours overlap with either part
+                        if (openTime <= businessEnd || closeTime >= businessStart) {
+                            return false; // Open during business hours, EXCLUDE
+                        }
+                    } else {
+                        // Normal range: check overlap with business hours
+                        if (openTime < businessEnd && closeTime > businessStart) {
+                            return false; // Open during business hours, EXCLUDE
+                        }
                     }
                 }
 
-                return true; // Closed during business hours
+                return true; // Closed during business hours = INCLUDE
             });
         }
 
@@ -1487,10 +1554,13 @@
 
                     if (place.openingHours && place.openingHours.length > 0) {
                         place.openingHours.forEach((dayHours, idx) => {
-                            const cleanHours = dayHours
+                            let cleanHours = dayHours
                                 .replace(/Monday:|Tuesday:|Wednesday:|Thursday:|Friday:|Saturday:|Sunday:/gi, '')
                                 .replace(/יום שני:|יום שלישי:|יום רביעי:|יום חמישי:|יום שישי:|שבת:|יום ראשון:/gi, '')
                                 .trim();
+
+                            // Convert 12-hour to 24-hour format
+                            cleanHours = convertTo24Hour(cleanHours);
 
                             const isSaturday = idx === 6; // Saturday is index 6 (Sunday=0)
                             hoursHtml += `
