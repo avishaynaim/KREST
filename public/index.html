@@ -963,8 +963,31 @@
                         <label for="closedSaturday" style="margin: 0;">🗓️ סגור בשבת (8:00-17:00)</label>
                     </div>
                     <div class="form-group" style="flex-direction: row; align-items: center; gap: 10px;">
-                        <input type="checkbox" id="openNow" checked style="width: auto;">
+                        <input type="checkbox" id="openNow" style="width: auto;">
                         <label for="openNow" style="margin: 0;">🕐 פתוח עכשיו</label>
+                    </div>
+                </div>
+
+                <div class="form-row" style="align-items: flex-end;">
+                    <div class="form-group" style="flex-direction: row; align-items: center; gap: 10px;">
+                        <input type="checkbox" id="openAtTime" style="width: auto;">
+                        <label for="openAtTime" style="margin: 0;">📅 פתוח ביום ושעה:</label>
+                    </div>
+                    <div class="form-group">
+                        <label for="filterDay">יום</label>
+                        <select id="filterDay">
+                            <option value="0">יום ראשון</option>
+                            <option value="1">יום שני</option>
+                            <option value="2">יום שלישי</option>
+                            <option value="3">יום רביעי</option>
+                            <option value="4">יום חמישי</option>
+                            <option value="5">יום שישי</option>
+                            <option value="6">שבת</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="filterTime">שעה</label>
+                        <input type="time" id="filterTime" value="12:00">
                     </div>
                 </div>
 
@@ -1113,6 +1136,37 @@
                 displayResults(false);
             }
         });
+
+        // Add event listeners for day/time filter
+        document.getElementById('openAtTime').addEventListener('change', () => {
+            if (allPlacesRaw.length > 0) {
+                applyClientFilters();
+                displayResults(false);
+            }
+        });
+
+        document.getElementById('filterDay').addEventListener('change', () => {
+            if (allPlacesRaw.length > 0 && document.getElementById('openAtTime').checked) {
+                applyClientFilters();
+                displayResults(false);
+            }
+        });
+
+        document.getElementById('filterTime').addEventListener('change', () => {
+            if (allPlacesRaw.length > 0 && document.getElementById('openAtTime').checked) {
+                applyClientFilters();
+                displayResults(false);
+            }
+        });
+
+        // Set default day to today and current time
+        (function setDefaultDayTime() {
+            const now = new Date();
+            document.getElementById('filterDay').value = now.getDay();
+            const hours = now.getHours().toString().padStart(2, '0');
+            const minutes = now.getMinutes().toString().padStart(2, '0');
+            document.getElementById('filterTime').value = `${hours}:${minutes}`;
+        })();
 
         // Update stars display based on rating input
         function updateStarsDisplay() {
@@ -1544,6 +1598,96 @@
             });
         }
 
+        // Filter places open at specific day and time
+        function filterOpenAtTime(places, dayIndex, timeMinutes) {
+            return places.filter(place => {
+                if (!place.openingHours || place.openingHours.length === 0) {
+                    return false; // No hours data, can't verify if open
+                }
+
+                const dayHours = place.openingHours[dayIndex];
+                if (!dayHours) {
+                    return false; // No data for this day
+                }
+
+                const lowerText = dayHours.toLowerCase();
+
+                // Check if closed
+                if (lowerText.includes('closed') || lowerText.includes('סגור')) {
+                    return false;
+                }
+
+                // Check if 24 hours
+                if (lowerText.includes('24 hours') || lowerText.includes('24 שעות')) {
+                    return true;
+                }
+
+                // Parse time ranges
+                const timePattern12h = /(\d{1,2}):(\d{2})\s*(am|pm)[\s–\-]+(\d{1,2}):(\d{2})\s*(am|pm)/gi;
+                const timePattern24h = /(\d{1,2}):(\d{2})[\s–\-]+(\d{1,2}):(\d{2})(?!\s*(am|pm))/gi;
+
+                const matches12h = [...dayHours.matchAll(timePattern12h)];
+                const matches24h = [...dayHours.matchAll(timePattern24h)];
+
+                const allTimeRanges = [];
+
+                // Process 12-hour matches
+                for (const match of matches12h) {
+                    let openHour = parseInt(match[1]);
+                    const openMin = parseInt(match[2]);
+                    const openPeriod = match[3].toLowerCase();
+                    let closeHour = parseInt(match[4]);
+                    const closeMin = parseInt(match[5]);
+                    const closePeriod = match[6].toLowerCase();
+
+                    if (openPeriod === 'pm' && openHour !== 12) openHour += 12;
+                    if (openPeriod === 'am' && openHour === 12) openHour = 0;
+                    if (closePeriod === 'pm' && closeHour !== 12) closeHour += 12;
+                    if (closePeriod === 'am' && closeHour === 12) closeHour = 0;
+
+                    allTimeRanges.push({
+                        openTime: openHour * 60 + openMin,
+                        closeTime: closeHour * 60 + closeMin
+                    });
+                }
+
+                // Process 24-hour matches
+                for (const match of matches24h) {
+                    const openHour = parseInt(match[1]);
+                    const openMin = parseInt(match[2]);
+                    const closeHour = parseInt(match[3]);
+                    const closeMin = parseInt(match[4]);
+
+                    allTimeRanges.push({
+                        openTime: openHour * 60 + openMin,
+                        closeTime: closeHour * 60 + closeMin
+                    });
+                }
+
+                if (allTimeRanges.length === 0) {
+                    return false; // No parseable time ranges
+                }
+
+                // Check if the specified time falls within any open range
+                for (const range of allTimeRanges) {
+                    const { openTime, closeTime } = range;
+
+                    if (closeTime < openTime) {
+                        // Overnight range
+                        if (timeMinutes >= openTime || timeMinutes < closeTime) {
+                            return true;
+                        }
+                    } else {
+                        if (timeMinutes >= openTime && timeMinutes < closeTime) {
+                            return true;
+                        }
+                    }
+                }
+
+                return false;
+            });
+        }
+
         function applyClientFilters() {
             // Start with raw data from server
             let filtered = [...allPlacesRaw];
@@ -1558,6 +1702,16 @@
             const openNow = document.getElementById('openNow').checked;
             if (openNow) {
                 filtered = filterOpenNow(filtered);
+            }
+
+            // Apply open at specific day/time filter if checked
+            const openAtTime = document.getElementById('openAtTime').checked;
+            if (openAtTime) {
+                const dayIndex = parseInt(document.getElementById('filterDay').value);
+                const timeValue = document.getElementById('filterTime').value;
+                const [hours, minutes] = timeValue.split(':').map(Number);
+                const timeMinutes = hours * 60 + minutes;
+                filtered = filterOpenAtTime(filtered, dayIndex, timeMinutes);
             }
 
             // Update filtered places
