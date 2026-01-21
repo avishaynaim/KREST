@@ -1603,8 +1603,8 @@
                 // Apply client-side filters
                 applyClientFilters();
 
-                // Display results
-                displayResults(false);
+                // Display results and scroll to them (initial search)
+                displayResults(false, true);
 
             } catch (error) {
                 loading.classList.remove('active');
@@ -1949,7 +1949,7 @@
         }
 
 
-        function displayResults(append = false) {
+        function displayResults(append = false, scrollToResults = false) {
             const { location, filters } = searchData;
             const count = allPlaces.length;
             const totalFetched = allPlacesRaw.length;
@@ -2137,8 +2137,10 @@
             if (!append) {
                 results.innerHTML = html;
                 results.classList.add('active');
-                // Scroll to results
-                results.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                // Only scroll to results on initial search, not on filter changes
+                if (scrollToResults) {
+                    results.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                }
             }
         }
 
