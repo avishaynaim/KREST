@@ -1286,7 +1286,8 @@
             }
         });
 
-        // Convert 12-hour format (e.g., "9:00 AM – 5:00 PM") to 24-hour format (e.g., "09:00 – 17:00")
+        // Convert 12-hour format to 24-hour format
+        // Handles: "9:00 AM – 5:00 PM", "10:00 – 6:00" (infers PM for close time)
         function convertTo24Hour(timeStr) {
             if (!timeStr) return timeStr;
 
@@ -1300,10 +1301,8 @@
                 return '24 שעות';
             }
 
-            // Pattern to match times like "9:00 AM" or "11:30 PM"
-            const timePattern = /(\d{1,2}):(\d{2})\s*(AM|PM|am|pm)/g;
-
-            return timeStr.replace(timePattern, (match, hour, min, period) => {
+            // First, convert explicit AM/PM times
+            let result = timeStr.replace(/(\d{1,2}):(\d{2})\s*(AM|PM|am|pm)/g, (match, hour, min, period) => {
                 let h = parseInt(hour);
                 const p = period.toUpperCase();
 
@@ -1315,6 +1314,43 @@
 
                 return `${h.toString().padStart(2, '0')}:${min}`;
             });
+
+            // Now handle time ranges WITHOUT AM/PM like "10:00 – 6:00" or "9:00–22:00"
+            // Pattern: time – time (with various dash types)
+            const rangePattern = /(\d{1,2}):(\d{2})\s*[–\-]\s*(\d{1,2}):(\d{2})/g;
+
+            result = result.replace(rangePattern, (match, h1, m1, h2, m2) => {
+                let openHour = parseInt(h1);
+                let closeHour = parseInt(h2);
+
+                // If hours are already > 12, they're already in 24h format
+                if (openHour > 12 || closeHour > 12) {
+                    return `${openHour.toString().padStart(2, '0')}:${m1} – ${closeHour.toString().padStart(2, '0')}:${m2}`;
+                }
+
+                // Infer: if close hour <= open hour numerically, close is likely PM
+                // e.g., "10:00 – 6:00" means 10:00 AM – 6:00 PM (18:00)
+                // e.g., "9:00 – 11:00" could be 9 AM – 11 AM or 9 AM – 11 PM (ambiguous, assume PM if close <= open)
+
+                // Typical business: opens morning (7-12), closes afternoon/evening (12-23)
+                // If open hour is small (<=12) and close hour is small (<=12) and close <= open, close is PM
+                if (closeHour <= openHour && closeHour <= 12) {
+                    closeHour += 12;
+                }
+                // If open hour is small and close is also small but close > open, could be morning hours
+                // e.g., "6:00 – 11:00" - likely 6 AM to 11 AM, keep as is
+                // But "10:00 – 10:00" would be weird - assume close is PM
+
+                // Also: typical restaurants/cafes open around 7-12 and close around 17-24
+                // If open < 12 and close < 12, and close time seems like evening (5,6,7,8,9,10,11), add 12
+                if (closeHour >= 5 && closeHour <= 11 && openHour >= 6 && openHour <= 12) {
+                    closeHour += 12;
+                }
+
+                return `${openHour.toString().padStart(2, '0')}:${m1} – ${closeHour.toString().padStart(2, '0')}:${m2}`;
+            });
+
+            return result;
         }
 
         function filterOpenNow(places) {
