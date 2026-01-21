@@ -88,6 +88,40 @@
             border-color: #667eea;
         }
 
+        /* Range slider styling */
+        input[type="range"] {
+            -webkit-appearance: none;
+            appearance: none;
+            height: 8px;
+            border-radius: 4px;
+            background: linear-gradient(to right, #667eea 0%, #764ba2 100%);
+            outline: none;
+            padding: 0;
+            border: none;
+        }
+
+        input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 24px;
+            height: 24px;
+            border-radius: 50%;
+            background: white;
+            border: 3px solid #667eea;
+            cursor: pointer;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.2);
+        }
+
+        input[type="range"]::-moz-range-thumb {
+            width: 24px;
+            height: 24px;
+            border-radius: 50%;
+            background: white;
+            border: 3px solid #667eea;
+            cursor: pointer;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.2);
+        }
+
         .search-button {
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             color: white;
@@ -899,10 +933,10 @@
 
                 <div class="form-row">
                     <div class="form-group">
-                        <label for="rating">⭐ דירוג מינימלי</label>
+                        <label for="rating">⭐ דירוג מינימלי: <span id="ratingValue">4.5</span></label>
                         <div style="display: flex; align-items: center; gap: 10px;">
-                            <input type="number" id="rating" value="4.5" min="1.0" max="5.0" step="0.1" style="width: 80px;" oninput="updateStarsDisplay()">
-                            <span id="starsDisplay" style="font-size: 1.2em; letter-spacing: 2px;"></span>
+                            <input type="range" id="rating" value="4.5" min="1.0" max="5.0" step="0.1" style="flex: 1; cursor: pointer;" oninput="updateStarsDisplay()">
+                            <span id="starsDisplay" style="font-size: 1.4em; letter-spacing: 2px; min-width: 100px;"></span>
                         </div>
                     </div>
                     <div class="form-group">
@@ -1084,6 +1118,12 @@
         function updateStarsDisplay() {
             const rating = parseFloat(document.getElementById('rating').value) || 0;
             const display = document.getElementById('starsDisplay');
+            const valueDisplay = document.getElementById('ratingValue');
+
+            // Update numeric value display
+            if (valueDisplay) {
+                valueDisplay.textContent = rating.toFixed(1);
+            }
 
             const fullStars = Math.floor(rating);
             const partialStar = rating - fullStars;
