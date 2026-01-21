@@ -1115,7 +1115,7 @@
                     </div>
                     <div class="form-group">
                         <label for="reviews">💬 ביקורות מינימליות</label>
-                        <input type="number" id="reviews" value="100" min="1">
+                        <input type="number" id="reviews" value="50" min="1">
                     </div>
                     <div class="form-group">
                         <label for="type">🍽️ סוג</label>
@@ -2159,6 +2159,10 @@
                 limit: document.getElementById('limit').value,
                 closedSaturday: document.getElementById('closedSaturday').checked,
                 openNow: document.getElementById('openNow').checked,
+                openAtTime: document.getElementById('openAtTime').checked,
+                filterDay: document.getElementById('filterDay').value,
+                filterHour: document.getElementById('filterHour').value,
+                filterMinute: document.getElementById('filterMinute').value,
                 cityValue: cityInput.value,
                 currentLocation: currentLocation
             };
@@ -2196,6 +2200,14 @@
                     if (settings.limit) document.getElementById('limit').value = settings.limit;
                     if (settings.closedSaturday !== undefined) document.getElementById('closedSaturday').checked = settings.closedSaturday;
                     if (settings.openNow !== undefined) document.getElementById('openNow').checked = settings.openNow;
+                    if (settings.openAtTime !== undefined) document.getElementById('openAtTime').checked = settings.openAtTime;
+                    if (settings.filterDay !== undefined) document.getElementById('filterDay').value = settings.filterDay;
+                    if (settings.filterHour !== undefined) document.getElementById('filterHour').value = settings.filterHour;
+                    if (settings.filterMinute !== undefined) document.getElementById('filterMinute').value = settings.filterMinute;
+
+                    // Update visual displays
+                    updateStarsDisplay();
+                    updateTimeDisplay();
 
                     // Restore location
                     if (settings.cityValue) {
@@ -2214,6 +2226,10 @@
                     console.error('Error loading settings:', e);
                 }
             }
+
+            // Always update displays after loading (even if no saved settings)
+            updateStarsDisplay();
+            updateTimeDisplay();
         }
 
         // Clear to default settings
@@ -2224,11 +2240,22 @@
             // Reset to defaults
             document.getElementById('radius').value = '5';
             document.getElementById('rating').value = '4.5';
-            document.getElementById('reviews').value = '100';
+            document.getElementById('reviews').value = '50';
             document.getElementById('type').value = 'both';
             document.getElementById('limit').value = '50';
             document.getElementById('closedSaturday').checked = true;
-            document.getElementById('openNow').checked = true;
+            document.getElementById('openNow').checked = false;
+            document.getElementById('openAtTime').checked = false;
+
+            // Reset day/time to current
+            const now = new Date();
+            document.getElementById('filterDay').value = now.getDay();
+            document.getElementById('filterHour').value = now.getHours();
+            document.getElementById('filterMinute').value = Math.round(now.getMinutes() / 5) * 5;
+
+            // Update visual displays
+            updateStarsDisplay();
+            updateTimeDisplay();
 
             // Clear location
             cityInput.value = '';
