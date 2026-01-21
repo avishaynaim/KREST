@@ -990,11 +990,11 @@
                         <div style="display: flex; flex-direction: column; gap: 8px;" dir="ltr">
                             <div style="display: flex; align-items: center; gap: 10px;">
                                 <span style="width: 40px; text-align: left;">Hour</span>
-                                <input type="range" id="filterHour" value="12" min="0" max="23" step="1" style="flex: 1;" oninput="updateTimeDisplay()">
+                                <input type="range" id="filterHour" value="12" min="0" max="23" step="1" style="flex: 1;">
                             </div>
                             <div style="display: flex; align-items: center; gap: 10px;">
                                 <span style="width: 40px; text-align: left;">Min</span>
-                                <input type="range" id="filterMinute" value="0" min="0" max="59" step="5" style="flex: 1;" oninput="updateTimeDisplay()">
+                                <input type="range" id="filterMinute" value="0" min="0" max="59" step="5" style="flex: 1;">
                             </div>
                         </div>
                     </div>
@@ -1161,14 +1161,16 @@
             }
         });
 
-        document.getElementById('filterHour').addEventListener('change', () => {
+        document.getElementById('filterHour').addEventListener('input', () => {
+            updateTimeDisplay();
             if (allPlacesRaw.length > 0 && document.getElementById('openAtTime').checked) {
                 applyClientFilters();
                 displayResults(false);
             }
         });
 
-        document.getElementById('filterMinute').addEventListener('change', () => {
+        document.getElementById('filterMinute').addEventListener('input', () => {
+            updateTimeDisplay();
             if (allPlacesRaw.length > 0 && document.getElementById('openAtTime').checked) {
                 applyClientFilters();
                 displayResults(false);
