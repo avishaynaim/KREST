@@ -26,10 +26,10 @@ import { config } from './config.js';
 // CONFIGURATION KNOBS
 const ADAPTIVE_TILING_CONFIG = {
   // Stop subdividing if tile radius gets this small (meters)
-  MIN_TILE_RADIUS: 500, // 500m minimum tile size
+  MIN_TILE_RADIUS: 150, // 150m minimum tile size (was 500m - too large for dense areas)
 
   // Stop subdividing after this many levels
-  MAX_DEPTH: 5, // 0=original, 1-5=subdivisions (up to 4^5=1024 tiles max)
+  MAX_DEPTH: 7, // 0=original, 1-7=subdivisions (increased from 5 for better coverage)
 
   // Google's hard limit per request
   MAX_RESULT_COUNT: 20,
@@ -40,7 +40,7 @@ const ADAPTIVE_TILING_CONFIG = {
   OVERLAP_FACTOR: 0.7,
 
   // Maximum API calls budget (safety limit)
-  MAX_API_CALLS: 200,
+  MAX_API_CALLS: 300, // Increased from 200 for better coverage in dense areas
 
   // Timeout per API call (ms)
   API_TIMEOUT: 10000,
