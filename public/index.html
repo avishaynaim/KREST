@@ -844,28 +844,171 @@
         }
 
         @media (max-width: 768px) {
+            body {
+                padding: 10px;
+            }
+
+            .header {
+                margin-bottom: 20px;
+            }
+
             .header h1 {
-                font-size: 1.8em;
+                font-size: 1.5em;
             }
 
             .header p {
-                font-size: 1em;
+                font-size: 0.9em;
             }
 
             .search-card {
-                padding: 20px;
+                padding: 15px;
+                border-radius: 12px;
+            }
+
+            .search-form {
+                gap: 15px;
+            }
+
+            .form-row {
+                grid-template-columns: 1fr;
+                gap: 12px;
+            }
+
+            .form-group {
+                margin-bottom: 5px;
+            }
+
+            label {
+                font-size: 0.85em;
+                margin-bottom: 6px;
+            }
+
+            input, select {
+                padding: 10px;
+                font-size: 16px; /* Prevents zoom on iOS */
+            }
+
+            /* Larger touch targets for sliders */
+            input[type="range"] {
+                height: 10px;
+            }
+
+            input[type="range"]::-webkit-slider-thumb {
+                width: 28px;
+                height: 28px;
+            }
+
+            input[type="range"]::-moz-range-thumb {
+                width: 28px;
+                height: 28px;
+            }
+
+            .search-button {
+                width: 100%;
+                padding: 14px;
+                font-size: 1em;
+            }
+
+            .settings-button {
+                padding: 10px 15px;
+                font-size: 0.85em;
             }
 
             .place-card {
-                padding: 20px;
+                padding: 15px;
             }
 
             .places-grid {
                 grid-template-columns: 1fr;
+                gap: 15px;
             }
 
             .place-name {
-                font-size: 1.2em;
+                font-size: 1.1em;
+            }
+
+            .place-address {
+                font-size: 0.85em;
+            }
+
+            .results-header {
+                padding: 15px;
+            }
+
+            .results-info {
+                flex-direction: column;
+                gap: 10px;
+            }
+
+            .info-item {
+                padding: 8px 12px;
+            }
+
+            /* Time filter compact layout */
+            .form-group > div[dir="ltr"] {
+                gap: 5px !important;
+            }
+
+            .form-group > div[dir="ltr"] > div {
+                gap: 8px !important;
+            }
+
+            .form-group > div[dir="ltr"] span {
+                width: 35px !important;
+                font-size: 0.8em;
+            }
+
+            /* Stars display */
+            #starsDisplay {
+                font-size: 1.2em !important;
+                min-width: 90px !important;
+            }
+
+            /* Hours section in place cards */
+            .hours-section {
+                margin-top: 10px;
+            }
+
+            .hours-day {
+                padding: 6px 8px;
+                font-size: 0.85em;
+            }
+
+            .map-link {
+                padding: 10px;
+                font-size: 0.9em;
+            }
+        }
+
+        /* Extra small devices */
+        @media (max-width: 400px) {
+            body {
+                padding: 8px;
+            }
+
+            .header h1 {
+                font-size: 1.3em;
+            }
+
+            .search-card {
+                padding: 12px;
+            }
+
+            .form-row {
+                gap: 10px;
+            }
+
+            input, select {
+                padding: 8px;
+            }
+
+            .place-card {
+                padding: 12px;
+            }
+
+            #starsDisplay {
+                font-size: 1em !important;
+                min-width: 80px !important;
             }
         }
     </style>
