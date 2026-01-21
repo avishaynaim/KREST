@@ -986,8 +986,12 @@
                         </select>
                     </div>
                     <div class="form-group">
-                        <label for="filterTime">שעה</label>
-                        <input type="time" id="filterTime" value="12:00">
+                        <label for="filterTime">שעה (24h)</label>
+                        <div style="display: flex; align-items: center; gap: 5px;">
+                            <input type="number" id="filterHour" value="12" min="0" max="23" style="width: 60px; text-align: center;">
+                            <span>:</span>
+                            <input type="number" id="filterMinute" value="00" min="0" max="59" style="width: 60px; text-align: center;">
+                        </div>
                     </div>
                 </div>
 
@@ -1152,7 +1156,14 @@
             }
         });
 
-        document.getElementById('filterTime').addEventListener('change', () => {
+        document.getElementById('filterHour').addEventListener('change', () => {
+            if (allPlacesRaw.length > 0 && document.getElementById('openAtTime').checked) {
+                applyClientFilters();
+                displayResults(false);
+            }
+        });
+
+        document.getElementById('filterMinute').addEventListener('change', () => {
             if (allPlacesRaw.length > 0 && document.getElementById('openAtTime').checked) {
                 applyClientFilters();
                 displayResults(false);
@@ -1163,9 +1174,8 @@
         (function setDefaultDayTime() {
             const now = new Date();
             document.getElementById('filterDay').value = now.getDay();
-            const hours = now.getHours().toString().padStart(2, '0');
-            const minutes = now.getMinutes().toString().padStart(2, '0');
-            document.getElementById('filterTime').value = `${hours}:${minutes}`;
+            document.getElementById('filterHour').value = now.getHours();
+            document.getElementById('filterMinute').value = now.getMinutes();
         })();
 
         // Update stars display based on rating input
@@ -1622,16 +1632,13 @@
                     return true;
                 }
 
-                // Parse time ranges
-                const timePattern12h = /(\d{1,2}):(\d{2})\s*(am|pm)[\s–\-]+(\d{1,2}):(\d{2})\s*(am|pm)/gi;
-                const timePattern24h = /(\d{1,2}):(\d{2})[\s–\-]+(\d{1,2}):(\d{2})(?!\s*(am|pm))/gi;
-
-                const matches12h = [...dayHours.matchAll(timePattern12h)];
-                const matches24h = [...dayHours.matchAll(timePattern24h)];
-
+                // Parse time ranges - handle all formats
                 const allTimeRanges = [];
 
-                // Process 12-hour matches
+                // Pattern for 12-hour with AM/PM
+                const timePattern12h = /(\d{1,2}):(\d{2})\s*(am|pm)[\s–\-]+(\d{1,2}):(\d{2})\s*(am|pm)/gi;
+                const matches12h = [...dayHours.matchAll(timePattern12h)];
+
                 for (const match of matches12h) {
                     let openHour = parseInt(match[1]);
                     const openMin = parseInt(match[2]);
@@ -1651,12 +1658,34 @@
                     });
                 }
 
-                // Process 24-hour matches
-                for (const match of matches24h) {
-                    const openHour = parseInt(match[1]);
+                // Pattern for 24-hour or times without AM/PM (e.g., "09:00 – 17:00" or "10:00 – 6:00")
+                const timePatternGeneral = /(\d{1,2}):(\d{2})[\s–\-]+(\d{1,2}):(\d{2})/g;
+                const matchesGeneral = [...dayHours.matchAll(timePatternGeneral)];
+
+                for (const match of matchesGeneral) {
+                    // Skip if this was already matched as 12-hour format
+                    const fullMatch = match[0];
+                    if (fullMatch.toLowerCase().includes('am') || fullMatch.toLowerCase().includes('pm')) {
+                        continue;
+                    }
+
+                    let openHour = parseInt(match[1]);
                     const openMin = parseInt(match[2]);
-                    const closeHour = parseInt(match[3]);
+                    let closeHour = parseInt(match[3]);
                     const closeMin = parseInt(match[4]);
+
+                    // If hours > 12, already in 24h format
+                    if (openHour <= 12 && closeHour <= 12) {
+                        // Ambiguous - infer based on typical business hours
+                        // If close <= open and close is small (5-11), it's likely PM
+                        if (closeHour <= openHour && closeHour >= 5 && closeHour <= 11) {
+                            closeHour += 12;
+                        }
+                        // If open is small (6-12) and close is small (5-11), close is likely PM
+                        if (openHour >= 6 && openHour <= 12 && closeHour >= 5 && closeHour <= 11) {
+                            closeHour += 12;
+                        }
+                    }
 
                     allTimeRanges.push({
                         openTime: openHour * 60 + openMin,
@@ -1672,12 +1701,13 @@
                 for (const range of allTimeRanges) {
                     const { openTime, closeTime } = range;
 
-                    if (closeTime < openTime) {
-                        // Overnight range
+                    if (closeTime <= openTime) {
+                        // Overnight range (e.g., 22:00 - 02:00)
                         if (timeMinutes >= openTime || timeMinutes < closeTime) {
                             return true;
                         }
                     } else {
+                        // Normal range
                         if (timeMinutes >= openTime && timeMinutes < closeTime) {
                             return true;
                         }
@@ -1708,8 +1738,8 @@
             const openAtTime = document.getElementById('openAtTime').checked;
             if (openAtTime) {
                 const dayIndex = parseInt(document.getElementById('filterDay').value);
-                const timeValue = document.getElementById('filterTime').value;
-                const [hours, minutes] = timeValue.split(':').map(Number);
+                const hours = parseInt(document.getElementById('filterHour').value) || 0;
+                const minutes = parseInt(document.getElementById('filterMinute').value) || 0;
                 const timeMinutes = hours * 60 + minutes;
                 filtered = filterOpenAtTime(filtered, dayIndex, timeMinutes);
             }
