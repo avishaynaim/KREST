@@ -36,6 +36,58 @@ function toRadians(degrees) {
 }
 
 /**
+ * Format opening hours from periods array to 24-hour format strings
+ * Old API periods format: { open: { day: 0, time: "0900" }, close: { day: 0, time: "1700" } }
+ * @param {Object} openingHours - opening_hours object from Places API
+ * @returns {Array<string>} Array of formatted strings like "Sunday: 09:00 – 17:00"
+ */
+function formatPeriodsTo24Hour(openingHours) {
+  if (!openingHours?.periods) {
+    // Fallback to weekday_text if no periods available
+    return openingHours?.weekday_text || [];
+  }
+
+  const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+  const dayHours = new Map(); // day -> array of {open, close} times
+
+  // Group periods by day
+  for (const period of openingHours.periods) {
+    const openDay = period.open?.day;
+    const openTime = period.open?.time; // "0900" format
+    const closeTime = period.close?.time; // "1700" format
+
+    if (openDay === undefined || !openTime) continue;
+
+    // Format "0900" to "09:00"
+    const formatTime = (t) => t ? `${t.slice(0, 2)}:${t.slice(2)}` : '00:00';
+
+    if (!dayHours.has(openDay)) {
+      dayHours.set(openDay, []);
+    }
+    dayHours.get(openDay).push({
+      open: formatTime(openTime),
+      close: closeTime ? formatTime(closeTime) : '00:00'
+    });
+  }
+
+  // Build formatted strings for each day (Sunday first: 0-6)
+  const result = [];
+  for (let day = 0; day < 7; day++) {
+    const times = dayHours.get(day);
+    if (!times || times.length === 0) {
+      result.push(`${dayNames[day]}: Closed`);
+    } else {
+      // Sort times and format
+      times.sort((a, b) => a.open.localeCompare(b.open));
+      const timeRanges = times.map(t => `${t.open} – ${t.close}`).join(', ');
+      result.push(`${dayNames[day]}: ${timeRanges}`);
+    }
+  }
+
+  return result;
+}
+
+/**
  * Checks if a place is closed on Saturday during business hours (8 AM - 5 PM)
  * @param {Object} openingHours - Opening hours object from Place Details API
  * @returns {boolean} True if closed during business hours on Saturday, false otherwise
@@ -178,7 +230,7 @@ export function formatPlace(place, searchLat, searchLng) {
     rating: place.rating || 0,
     reviewCount: place.user_ratings_total || 0,
     distance: distance,
-    openingHours: place.opening_hours?.weekday_text || [],
+    openingHours: formatPeriodsTo24Hour(place.opening_hours),
     phone: place.formatted_phone_number || null,
     photos: place.photos?.map(photo => ({
       reference: photo.photo_reference,
