@@ -986,11 +986,16 @@
                         </select>
                     </div>
                     <div class="form-group">
-                        <label for="filterTime">שעה (24h)</label>
-                        <div style="display: flex; align-items: center; gap: 5px;">
-                            <input type="number" id="filterHour" value="12" min="0" max="23" style="width: 60px; text-align: center;">
-                            <span>:</span>
-                            <input type="number" id="filterMinute" value="00" min="0" max="59" style="width: 60px; text-align: center;">
+                        <label>שעה: <span id="timeDisplay">12:00</span></label>
+                        <div style="display: flex; flex-direction: column; gap: 8px;" dir="ltr">
+                            <div style="display: flex; align-items: center; gap: 10px;">
+                                <span style="width: 40px; text-align: left;">Hour</span>
+                                <input type="range" id="filterHour" value="12" min="0" max="23" step="1" style="flex: 1;" oninput="updateTimeDisplay()">
+                            </div>
+                            <div style="display: flex; align-items: center; gap: 10px;">
+                                <span style="width: 40px; text-align: left;">Min</span>
+                                <input type="range" id="filterMinute" value="0" min="0" max="59" step="5" style="flex: 1;" oninput="updateTimeDisplay()">
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -1170,12 +1175,22 @@
             }
         });
 
+        // Update time display when sliders change
+        function updateTimeDisplay() {
+            const hours = parseInt(document.getElementById('filterHour').value) || 0;
+            const minutes = parseInt(document.getElementById('filterMinute').value) || 0;
+            const display = document.getElementById('timeDisplay');
+            display.textContent = `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`;
+        }
+
         // Set default day to today and current time
         (function setDefaultDayTime() {
             const now = new Date();
             document.getElementById('filterDay').value = now.getDay();
             document.getElementById('filterHour').value = now.getHours();
-            document.getElementById('filterMinute').value = now.getMinutes();
+            // Round minutes to nearest 5
+            document.getElementById('filterMinute').value = Math.round(now.getMinutes() / 5) * 5;
+            updateTimeDisplay();
         })();
 
         // Update stars display based on rating input
