@@ -321,22 +321,17 @@ export function convertNewPlaceToOldFormat(newPlace, searchLat, searchLng) {
   // Calculate distance using Haversine
   const distance = calculateDistance(searchLat, searchLng, lat, lng);
 
-  // Extract opening hours from new API format
+  // Extract opening hours from new API format in 24-hour format
   // Prefer currentOpeningHours (includes holidays), fallback to regularOpeningHours
+  // Use periods data for 24-hour format instead of weekdayDescriptions (AM/PM)
   let openingHours = [];
-  if (newPlace.currentOpeningHours?.weekdayDescriptions) {
-    openingHours = newPlace.currentOpeningHours.weekdayDescriptions;
-  } else if (newPlace.regularOpeningHours?.weekdayDescriptions) {
-    openingHours = newPlace.regularOpeningHours.weekdayDescriptions;
+  if (newPlace.currentOpeningHours) {
+    openingHours = formatPeriodsTo24Hour(newPlace.currentOpeningHours);
+  } else if (newPlace.regularOpeningHours) {
+    openingHours = formatPeriodsTo24Hour(newPlace.regularOpeningHours);
   }
 
-  // CRITICAL: New API returns weekdays starting with Monday [Mon,Tue,Wed,Thu,Fri,Sat,Sun]
-  // Old API (and our UI) expects Sunday first [Sun,Mon,Tue,Wed,Thu,Fri,Sat]
-  // Reorder: move last element (Sunday) to the front
-  if (openingHours.length === 7) {
-    const sunday = openingHours[6]; // Last element is Sunday in new API
-    openingHours = [sunday, ...openingHours.slice(0, 6)]; // [Sun, Mon, Tue, Wed, Thu, Fri, Sat]
-  }
+  // Note: formatPeriodsTo24Hour already returns in Sunday-first order [Sun,Mon,Tue,Wed,Thu,Fri,Sat]
 
   // Construct Google Maps URL
   // New API provides googleMapsUri, add Hebrew language parameter
@@ -383,4 +378,54 @@ function calculateDistance(lat1, lng1, lat2, lng2) {
 
 function toRadians(degrees) {
   return degrees * (Math.PI / 180);
+}
+
+/**
+ * Format opening hours from periods array to 24-hour format strings
+ * @param {Object} openingHours - regularOpeningHours or currentOpeningHours object
+ * @returns {Array<string>} Array of formatted strings like "Sunday: 09:00 – 17:00"
+ */
+function formatPeriodsTo24Hour(openingHours) {
+  if (!openingHours?.periods) {
+    // Fallback to weekdayDescriptions if no periods available
+    return openingHours?.weekdayDescriptions || [];
+  }
+
+  const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+  const dayHours = new Map(); // day -> array of {open, close} times
+
+  // Group periods by day
+  for (const period of openingHours.periods) {
+    const openDay = period.open?.day;
+    const openHour = period.open?.hour ?? 0;
+    const openMinute = period.open?.minute ?? 0;
+    const closeHour = period.close?.hour ?? 0;
+    const closeMinute = period.close?.minute ?? 0;
+
+    if (openDay === undefined) continue;
+
+    const openTime = `${String(openHour).padStart(2, '0')}:${String(openMinute).padStart(2, '0')}`;
+    const closeTime = `${String(closeHour).padStart(2, '0')}:${String(closeMinute).padStart(2, '0')}`;
+
+    if (!dayHours.has(openDay)) {
+      dayHours.set(openDay, []);
+    }
+    dayHours.get(openDay).push({ open: openTime, close: closeTime });
+  }
+
+  // Build formatted strings for each day (Sunday first: 0-6)
+  const result = [];
+  for (let day = 0; day < 7; day++) {
+    const times = dayHours.get(day);
+    if (!times || times.length === 0) {
+      result.push(`${dayNames[day]}: Closed`);
+    } else {
+      // Sort times and format (handles multiple ranges like "09:00 – 12:00, 14:00 – 18:00")
+      times.sort((a, b) => a.open.localeCompare(b.open));
+      const timeRanges = times.map(t => `${t.open} – ${t.close}`).join(', ');
+      result.push(`${dayNames[day]}: ${timeRanges}`);
+    }
+  }
+
+  return result;
 }
