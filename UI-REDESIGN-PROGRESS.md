@@ -1,7 +1,9 @@
 # KREST UI/UX Redesign Progress
 
-## Status: COMPLETE
+## Status: DEPLOYED TO PRODUCTION ✅
 Last Updated: 2026-01-29
+
+**Live URL**: https://krest-production.up.railway.app/
 
 ---
 
@@ -115,9 +117,16 @@ Dark Mode:
 
 ---
 
-## Next Steps
-1. Write complete new index.html with all features
-2. Test locally
-3. Update service-worker.js
-4. Commit and push to GitHub
-5. Test on Railway deployment
+## Deployment Log
+
+| Date | Action | Status |
+|------|--------|--------|
+| 2026-01-29 | Created v1.3.0 tag for rollback | ✅ |
+| 2026-01-29 | Pushed UI redesign to GitHub | ✅ |
+| 2026-01-29 | Fixed package-lock.json sync issue | ✅ |
+| 2026-01-29 | Deployed to Railway via `railway up` | ✅ |
+| 2026-01-29 | Verified new UI live on production | ✅ |
+
+## Commits
+- `7e319bb` - UI/UX redesign v2.0
+- `936546e` - Update package-lock.json to sync

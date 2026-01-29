@@ -182,8 +182,7 @@ export async function getPlaceDetails(placeId, timeout = 10000) {
       params: {
         place_id: placeId,
         fields: ['name', 'formatted_address', 'geometry', 'rating', 'user_ratings_total',
-                 'opening_hours', 'formatted_phone_number', 'photos', 'place_id', 'url',
-                 'website', 'price_level', 'business_status', 'types'],
+                 'opening_hours', 'formatted_phone_number', 'photos', 'place_id', 'url'],
         language: 'he',
         key: apiKey,
       },
@@ -221,13 +220,6 @@ export function formatPlace(place, searchLat, searchLng) {
     place.geometry.location.lng
   );
 
-  // Construct photo URLs with API key
-  const photoUrls = place.photos?.map(photo => ({
-    url: `https://maps.googleapis.com/maps/api/place/photo?maxwidth=${Math.min(photo.width || 400, 800)}&photo_reference=${photo.photo_reference}&key=${apiKey}`,
-    width: photo.width,
-    height: photo.height,
-  })) || [];
-
   return {
     name: place.name,
     address: place.formatted_address,
@@ -240,11 +232,11 @@ export function formatPlace(place, searchLat, searchLng) {
     distance: distance,
     openingHours: formatPeriodsTo24Hour(place.opening_hours),
     phone: place.formatted_phone_number || null,
-    photos: photoUrls,
-    website: place.website || null,
-    priceLevel: place.price_level || null,
-    businessStatus: place.business_status || 'OPERATIONAL',
-    type: place.types?.[0] || 'restaurant',
+    photos: place.photos?.map(photo => ({
+      reference: photo.photo_reference,
+      width: photo.width,
+      height: photo.height,
+    })) || [],
     googleMapsUrl: place.url
       ? `${place.url}${place.url.includes('?') ? '&' : '?'}hl=he`
       : `https://www.google.com/maps/place/?q=place_id:${place.place_id}&hl=he`,
