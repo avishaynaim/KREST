@@ -661,48 +661,22 @@
             background: #357ae8;
         }
 
-        .kosher-check-btn {
-            display: inline-block;
-            margin-top: 10px;
-            margin-left: 10px;
-            padding: 8px 16px;
-            background: linear-gradient(135deg, #4caf50 0%, #45a049 100%);
-            color: white;
-            border: none;
-            border-radius: 8px;
-            font-weight: 600;
-            cursor: pointer;
-            transition: transform 0.2s, box-shadow 0.2s;
-            font-size: 0.9em;
-        }
-
-        .kosher-check-btn:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 4px 15px rgba(76, 175, 80, 0.4);
-        }
-
-        .kosher-check-btn:disabled {
-            background: #ccc;
-            cursor: not-allowed;
-            transform: none;
-        }
-
-        .kosher-check-btn.loading {
-            animation: pulse 1.5s ease-in-out infinite;
-        }
-
         .kosher-info {
             margin-top: 15px;
             padding: 15px;
             background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
             border-radius: 10px;
             border-right: 4px solid #4caf50;
-            display: none;
         }
 
-        .kosher-info.active {
-            display: block;
+        .kosher-info.loaded {
             animation: fadeIn 0.3s ease-out;
+        }
+
+        .kosher-loading {
+            color: #667eea;
+            font-weight: 500;
+            animation: pulse 1.5s ease-in-out infinite;
         }
 
         .kosher-info.error {
@@ -961,7 +935,7 @@
             <p>מצא מסעדות ובתי קפה סגורים בשבת</p>
             <div style="margin-top: 10px;">
                 <span style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 6px 16px; border-radius: 20px; font-size: 0.85em; font-weight: 600; display: inline-block;">
-                    🎯 SMART ALGO RANGE v1.3 - All Features Working
+                    🎯 KREST v2.1.0 - Auto Kosher Check
                 </span>
             </div>
         </div>
@@ -1707,10 +1681,9 @@
                             </div>
 
                             <a href="${place.googleMapsUrl}" target="_blank" class="map-link">🗺️ פתח במפות גוגל</a>
-                            <button class="kosher-check-btn" onclick="checkKosherInfo(this, '${place.name.replace(/'/g, "\\'")}', '${place.address.replace(/'/g, "\\'")}')">
-                                🕎 בדוק כשרות
-                            </button>
-                            <div class="kosher-info" id="kosher-info-${index}"></div>
+                            <div class="kosher-info" id="kosher-info-${index}" data-place-name="${place.name.replace(/"/g, '&quot;')}" data-place-address="${place.address.replace(/"/g, '&quot;')}">
+                                <div class="kosher-loading">🔄 טוען מידע כשרות...</div>
+                            </div>
                         </div>
                     `;
                 });
@@ -1749,6 +1722,144 @@
                 // Scroll to results
                 results.scrollIntoView({ behavior: 'smooth', block: 'start' });
             }
+
+            // Auto-load kosher info for visible cards
+            setTimeout(() => {
+                autoLoadKosherInfo();
+            }, 500);
+        }
+
+        // Auto-load kosher info for all visible cards
+        async function autoLoadKosherInfo() {
+            const apiKey = getOpenRouterApiKey();
+            if (!apiKey) {
+                // Show message in all kosher info divs
+                document.querySelectorAll('.kosher-info').forEach(div => {
+                    div.innerHTML = '<div style="color: #ff9800;">⚠️ הזן מפתח OpenRouter בהגדרות למעלה לקבלת מידע כשרות</div>';
+                });
+                return;
+            }
+
+            // Get all kosher info divs that haven't been loaded yet
+            const kosherDivs = document.querySelectorAll('.kosher-info[data-place-name]');
+
+            // Process in batches to avoid rate limiting
+            for (let i = 0; i < kosherDivs.length; i++) {
+                const div = kosherDivs[i];
+                if (div.classList.contains('loaded')) continue;
+
+                const placeName = div.getAttribute('data-place-name');
+                const placeAddress = div.getAttribute('data-place-address');
+
+                // Load kosher info
+                await loadKosherInfoForDiv(div, placeName, placeAddress, apiKey);
+
+                // Small delay between requests to avoid rate limiting
+                if (i < kosherDivs.length - 1) {
+                    await new Promise(resolve => setTimeout(resolve, 300));
+                }
+            }
+        }
+
+        async function loadKosherInfoForDiv(div, placeName, placeAddress, apiKey) {
+            try {
+                const prompt = `Search the web for information about this restaurant in Israel and provide kosher status:
+
+Restaurant: "${placeName}"
+Address: "${placeAddress}"
+
+Please search for:
+1. The restaurant's official website
+2. "${placeName} כשרות" (kosher certification)
+3. "${placeName} ${placeAddress}" reviews
+
+Based on your web search, provide in Hebrew:
+
+🔍 מקור המידע: [מאיפה מצאת את המידע - אתר רשמי/ביקורות/וכו']
+✡️ סטטוס כשרות: [כשר/לא כשר/לא נמצא מידע]
+📜 השגחה: [רבנות/בד"ץ/מהדרין/לא ידוע]
+🍽️ סוג: [בשרי/חלבי/פרווה/לא ידוע]
+🌐 אתר: [כתובת האתר אם נמצא]
+📞 טלפון: [אם נמצא]
+💡 מידע נוסף: [כל מידע רלוונטי שמצאת]
+
+If you cannot find specific kosher information, say so clearly. Be factual based on what you actually find online.
+Answer in Hebrew only.`;
+
+                const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${apiKey}`,
+                        'HTTP-Referer': window.location.origin,
+                        'X-Title': 'KREST Restaurant Finder'
+                    },
+                    body: JSON.stringify({
+                        model: 'perplexity/sonar-pro',
+                        messages: [{ role: 'user', content: prompt }],
+                        max_tokens: 1000,
+                        temperature: 0.3
+                    })
+                });
+
+                if (!response.ok) {
+                    throw new Error(`API error: ${response.status}`);
+                }
+
+                const data = await response.json();
+                const aiResponse = data.choices[0]?.message?.content || 'לא התקבל מידע';
+
+                displayKosherInfoInDiv(div, aiResponse, placeName);
+                div.classList.add('loaded');
+
+            } catch (error) {
+                console.error('Kosher info error:', error);
+                div.innerHTML = `<div style="color: #f44336;">❌ שגיאה בטעינת מידע כשרות</div>`;
+                div.classList.add('loaded');
+            }
+        }
+
+        function displayKosherInfoInDiv(container, response, placeName) {
+            // Try to extract badges from response
+            const badges = [];
+
+            // Check for kosher likelihood
+            if (response.includes('סביר שכשר') || response.includes('כשר למהדרין') || response.includes('בהשגחת') || (response.includes('כשר') && !response.includes('לא כשר') && !response.includes('לא נמצא'))) {
+                badges.push('<span class="kosher-badge badge-kosher">✓ כשר</span>');
+            } else if (response.includes('לא כשר')) {
+                badges.push('<span class="kosher-badge badge-not-kosher">✗ לא כשר</span>');
+            } else if (response.includes('לא נמצא מידע') || response.includes('לא ברור')) {
+                badges.push('<span class="kosher-badge badge-unknown">❓ לא נמצא מידע</span>');
+            }
+
+            // Check for dairy/meat
+            if (response.includes('חלבי') && !response.includes('לא חלבי') && !response.includes('לא ידוע')) {
+                badges.push('<span class="kosher-badge badge-dairy">🥛 חלבי</span>');
+            }
+            if (response.includes('בשרי') && !response.includes('לא בשרי') && !response.includes('לא ידוע')) {
+                badges.push('<span class="kosher-badge badge-meat">🥩 בשרי</span>');
+            }
+            if (response.includes('רבנות')) {
+                badges.push('<span class="kosher-badge badge-kosher">📜 רבנות</span>');
+            }
+            if (response.includes('מהדרין')) {
+                badges.push('<span class="kosher-badge badge-kosher">⭐ מהדרין</span>');
+            }
+            if (response.includes('בד"ץ') || response.includes('בדץ')) {
+                badges.push('<span class="kosher-badge badge-kosher">🏅 בד"ץ</span>');
+            }
+
+            const formattedResponse = response
+                .replace(/\n/g, '<br>')
+                .replace(/\*\*/g, '')
+                .replace(/\*/g, '•');
+
+            container.innerHTML = `
+                <div class="kosher-info-title">🕎 מידע כשרות</div>
+                <div style="margin-bottom: 10px;">${badges.join(' ') || '<span class="kosher-badge badge-unknown">❓</span>'}</div>
+                <div class="kosher-info-content">${formattedResponse}</div>
+                <div style="margin-top: 10px; font-size: 0.8em; color: #888;">⚠️ יש לאמת מול המסעדה</div>
+            `;
         }
 
         function showMore() {
