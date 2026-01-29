@@ -2117,18 +2117,30 @@
             button.textContent = '🔄 בודק...';
 
             try {
-                const prompt = `You are a helpful assistant that provides information about restaurants in Israel.
+                const prompt = `אתה מומחה לכשרות מסעדות בישראל. עליך לנתח את שם המסעדה והכתובת ולתת הערכה מושכלת.
 
-For the restaurant "${placeName}" located at "${placeAddress}", please provide the following information in Hebrew:
+מסעדה: "${placeName}"
+כתובת: "${placeAddress}"
 
-1. Is it kosher? (כשר/לא כשר/לא ידוע)
-2. If kosher, what type? (בשרי/חלבי/פרווה)
-3. What kosher certification does it have? (רבנות/בד"ץ/מהדרין/אחר)
-4. Any other important dietary information
+נתח את המידע הבא:
+1. האם השם מרמז על כשרות? (למשל: שמות עבריים, מילים כמו "כשר", "מהדרין", "גלאט")
+2. האם השם מרמז על סוג אוכל? (בשרי/חלבי/דגים/טבעוני)
+3. האם הכתובת באזור דתי? (בני ברק, ירושלים מרכז, רמת גן הדתית וכו')
+4. האם זו רשת מוכרת? (אם כן, מה ידוע עליה)
 
-Please respond in a structured format with short, clear answers. If you don't have reliable information, say "לא ידוע" (unknown).
+בהתבסס על הניתוח, תן תשובה בפורמט הבא:
 
-Respond ONLY in Hebrew.`;
+🔍 ניתוח השם: [מה השם מרמז]
+📍 ניתוח המיקום: [מה המיקום מרמז]
+🍽️ סוג משוער: [בשרי/חלבי/פרווה/מעורב/לא ברור]
+✡️ הערכת כשרות: [סביר שכשר/לא ברור/סביר שלא כשר] + הסבר קצר
+⭐ רמת ודאות: [גבוהה/בינונית/נמוכה]
+💡 המלצה: [מה כדאי לבדוק]
+
+אם זו רשת מוכרת (כמו ארומה, קפה קפה, מקדונלדס, BBB, שיפודי התקווה וכו') - ציין מה ידוע על הכשרות שלה.
+אם השם בערבית או אנגלית ללא סממנים יהודיים - ציין זאת.
+
+ענה בעברית בלבד. היה ספציפי ומועיל.`;
 
                 const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
                     method: 'POST',
@@ -2139,15 +2151,15 @@ Respond ONLY in Hebrew.`;
                         'X-Title': 'KREST Restaurant Finder'
                     },
                     body: JSON.stringify({
-                        model: 'google/gemini-2.0-flash-001',
+                        model: 'anthropic/claude-3.5-sonnet',
                         messages: [
                             {
                                 role: 'user',
                                 content: prompt
                             }
                         ],
-                        max_tokens: 500,
-                        temperature: 0.3
+                        max_tokens: 800,
+                        temperature: 0.5
                     })
                 });
 
@@ -2180,22 +2192,27 @@ Respond ONLY in Hebrew.`;
             // Try to extract badges from response
             const badges = [];
 
-            // Check for kosher status
-            if (response.includes('כשר') && !response.includes('לא כשר')) {
-                badges.push('<span class="kosher-badge badge-kosher">✓ כשר</span>');
-            } else if (response.includes('לא כשר')) {
-                badges.push('<span class="kosher-badge badge-not-kosher">✗ לא כשר</span>');
+            // Check for kosher likelihood
+            if (response.includes('סביר שכשר') || response.includes('כשר למהדרין') || response.includes('בהשגחת')) {
+                badges.push('<span class="kosher-badge badge-kosher">✓ סביר שכשר</span>');
+            } else if (response.includes('סביר שלא כשר') || response.includes('לא כשר')) {
+                badges.push('<span class="kosher-badge badge-not-kosher">✗ כנראה לא כשר</span>');
+            } else if (response.includes('לא ברור') || response.includes('לא ניתן לקבוע')) {
+                badges.push('<span class="kosher-badge badge-unknown">❓ לא ברור</span>');
             }
 
             // Check for dairy/meat
-            if (response.includes('חלבי')) {
+            if (response.includes('חלבי') && !response.includes('לא חלבי')) {
                 badges.push('<span class="kosher-badge badge-dairy">🥛 חלבי</span>');
             }
-            if (response.includes('בשרי')) {
+            if (response.includes('בשרי') && !response.includes('לא בשרי')) {
                 badges.push('<span class="kosher-badge badge-meat">🥩 בשרי</span>');
             }
             if (response.includes('פרווה')) {
                 badges.push('<span class="kosher-badge badge-parve">🥗 פרווה</span>');
+            }
+            if (response.includes('טבעוני')) {
+                badges.push('<span class="kosher-badge badge-parve">🌱 טבעוני</span>');
             }
 
             // Check for certification
@@ -2205,10 +2222,15 @@ Respond ONLY in Hebrew.`;
             if (response.includes('בד"ץ') || response.includes('בדץ')) {
                 badges.push('<span class="kosher-badge badge-kosher">🏅 בד"ץ</span>');
             }
+            if (response.includes('רבנות')) {
+                badges.push('<span class="kosher-badge badge-kosher">📜 רבנות</span>');
+            }
 
-            // If no badges found, add unknown
-            if (badges.length === 0) {
-                badges.push('<span class="kosher-badge badge-unknown">❓ לא ידוע</span>');
+            // Check confidence level
+            if (response.includes('ודאות: גבוהה') || response.includes('רמת ודאות: גבוהה')) {
+                badges.push('<span class="kosher-badge" style="background:#a5d6a7;color:#1b5e20;">📊 ודאות גבוהה</span>');
+            } else if (response.includes('ודאות: נמוכה') || response.includes('רמת ודאות: נמוכה')) {
+                badges.push('<span class="kosher-badge" style="background:#ffcc80;color:#e65100;">📊 ודאות נמוכה</span>');
             }
 
             // Format the response with line breaks
