@@ -935,7 +935,7 @@
             <p>מצא מסעדות ובתי קפה סגורים בשבת</p>
             <div style="margin-top: 10px;">
                 <span style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 6px 16px; border-radius: 20px; font-size: 0.85em; font-weight: 600; display: inline-block;">
-                    🎯 KREST v2.2.0 - Server-Side Kosher
+                    🎯 KREST v2.3.0 - Parallel Kosher Load
                 </span>
             </div>
         </div>
@@ -1714,25 +1714,28 @@
             }, 500);
         }
 
-        // Auto-load kosher info for all visible cards
+        // Auto-load kosher info for all visible cards - PARALLEL loading
         async function autoLoadKosherInfo() {
             // Get all kosher info divs that haven't been loaded yet
-            const kosherDivs = document.querySelectorAll('.kosher-info[data-place-name]');
+            const kosherDivs = document.querySelectorAll('.kosher-info[data-place-name]:not(.loaded)');
 
-            // Process in batches to avoid rate limiting
-            for (let i = 0; i < kosherDivs.length; i++) {
-                const div = kosherDivs[i];
-                if (div.classList.contains('loaded')) continue;
+            // Process in parallel batches of 5 to balance speed and rate limits
+            const batchSize = 5;
+            const divArray = Array.from(kosherDivs);
 
-                const placeName = div.getAttribute('data-place-name');
-                const placeAddress = div.getAttribute('data-place-address');
+            for (let i = 0; i < divArray.length; i += batchSize) {
+                const batch = divArray.slice(i, i + batchSize);
 
-                // Load kosher info from backend
-                await loadKosherInfoForDiv(div, placeName, placeAddress);
+                // Load batch in parallel
+                await Promise.all(batch.map(div => {
+                    const placeName = div.getAttribute('data-place-name');
+                    const placeAddress = div.getAttribute('data-place-address');
+                    return loadKosherInfoForDiv(div, placeName, placeAddress);
+                }));
 
-                // Small delay between requests to avoid rate limiting
-                if (i < kosherDivs.length - 1) {
-                    await new Promise(resolve => setTimeout(resolve, 500));
+                // Small delay between batches to avoid overwhelming the API
+                if (i + batchSize < divArray.length) {
+                    await new Promise(resolve => setTimeout(resolve, 200));
                 }
             }
         }
