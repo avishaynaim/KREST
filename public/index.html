@@ -1075,6 +1075,22 @@
                     </p>
                 </div>
 
+                <!-- OpenRouter API Key Settings -->
+                <div id="openRouterSection" style="margin-top: 15px; padding: 15px; background: linear-gradient(135deg, #e8f5e9 0%, #c8e6c9 100%); border-radius: 8px; border-right: 4px solid #4caf50;">
+                    <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 10px;">
+                        <span>🕎</span>
+                        <strong>OpenRouter API Key (לבדיקת כשרות)</strong>
+                    </div>
+                    <input type="password" id="openRouterApiKey" placeholder="הזן את מפתח OpenRouter API שלך"
+                           style="width: 100%; padding: 10px; border: 1px solid #a5d6a7; border-radius: 6px; margin-bottom: 10px;">
+                    <button type="button" onclick="saveOpenRouterApiKey()" style="width: 100%; padding: 10px; background: linear-gradient(135deg, #4caf50 0%, #45a049 100%); color: white; border: none; border-radius: 6px; cursor: pointer; font-weight: 600;">
+                        💾 שמור מפתח OpenRouter
+                    </button>
+                    <p style="font-size: 0.8em; color: #555; margin-top: 8px;">
+                        קבל מפתח API מ-<a href="https://openrouter.ai/keys" target="_blank" style="color: #2e7d32;">OpenRouter.ai</a> (נדרש לבדיקת כשרות AI)
+                    </p>
+                </div>
+
                 <div class="form-row" style="margin-top: 15px; gap: 10px;">
                     <button type="button" class="settings-button save-button" onclick="saveSettings()">💾 שמור הגדרות</button>
                     <button type="button" class="settings-button clear-button" onclick="clearToDefault()">🔄 איפוס לברירת מחדל</button>
@@ -1854,6 +1870,7 @@
         // Load settings on page load
         window.addEventListener('DOMContentLoaded', () => {
             loadSettings();
+            loadOpenRouterApiKey();
             // Show API key section for mobile app
             if (typeof Capacitor !== 'undefined') {
                 showApiKeySection();
@@ -1975,6 +1992,30 @@
         }
 
         /**
+         * Show OpenRouter API key section
+         */
+        function showOpenRouterSection() {
+            const section = document.getElementById('openRouterSection');
+            if (section) {
+                section.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                section.style.animation = 'pulse 1s ease-in-out 3';
+            }
+        }
+
+        /**
+         * Load OpenRouter API key on page load
+         */
+        function loadOpenRouterApiKey() {
+            const savedKey = localStorage.getItem('openRouterApiKey');
+            if (savedKey) {
+                const input = document.getElementById('openRouterApiKey');
+                if (input) {
+                    input.value = savedKey;
+                }
+            }
+        }
+
+        /**
          * Show server status message to user
          */
         function showServerStatus(message) {
@@ -2039,9 +2080,28 @@
         }
 
         // OpenRouter API for Kosher Information
-        const OPENROUTER_API_KEY = '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';
+        function getOpenRouterApiKey() {
+            return localStorage.getItem('openRouterApiKey') || '';
+        }
+
+        function saveOpenRouterApiKey() {
+            const apiKeyInput = document.getElementById('openRouterApiKey');
+            const apiKey = apiKeyInput.value.trim();
+            if (!apiKey) {
+                alert('נא להזין מפתח API');
+                return;
+            }
+            localStorage.setItem('openRouterApiKey', apiKey);
+            alert('✅ מפתח OpenRouter נשמר בהצלחה!');
+        }
 
         async function checkKosherInfo(button, placeName, placeAddress) {
+            const apiKey = getOpenRouterApiKey();
+            if (!apiKey) {
+                alert('נא להזין מפתח OpenRouter API בהגדרות למטה');
+                showOpenRouterSection();
+                return;
+            }
             // Find the kosher info div (next sibling of button)
             const kosherInfoDiv = button.nextElementSibling;
 
@@ -2074,7 +2134,7 @@ Respond ONLY in Hebrew.`;
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
-                        'Authorization': `Bearer ${OPENROUTER_API_KEY}`,
+                        'Authorization': `Bearer ${apiKey}`,
                         'HTTP-Referer': window.location.origin,
                         'X-Title': 'KREST Restaurant Finder'
                     },
