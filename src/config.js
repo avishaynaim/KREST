@@ -11,6 +11,9 @@ export const config = {
   // This is made optional here and will be validated when actually used
   googlePlacesApiKey: process.env.GOOGLE_PLACES_API_KEY || null,
 
+  // OpenRouter API Key for kosher info
+  openRouterApiKey: process.env.OPENROUTER_API_KEY || null,
+
   // Server configuration
   port: parseInt(process.env.PORT || '3000', 10),
 

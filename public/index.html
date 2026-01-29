@@ -935,7 +935,7 @@
             <p>מצא מסעדות ובתי קפה סגורים בשבת</p>
             <div style="margin-top: 10px;">
                 <span style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 6px 16px; border-radius: 20px; font-size: 0.85em; font-weight: 600; display: inline-block;">
-                    🎯 KREST v2.1.0 - Auto Kosher Check
+                    🎯 KREST v2.2.0 - Server-Side Kosher
                 </span>
             </div>
         </div>
@@ -1049,22 +1049,7 @@
                     </p>
                 </div>
 
-                <!-- OpenRouter API Key Settings -->
-                <div id="openRouterSection" style="margin-top: 15px; padding: 15px; background: linear-gradient(135deg, #e8f5e9 0%, #c8e6c9 100%); border-radius: 8px; border-right: 4px solid #4caf50;">
-                    <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 10px;">
-                        <span>🕎</span>
-                        <strong>OpenRouter API Key (לבדיקת כשרות)</strong>
-                    </div>
-                    <input type="password" id="openRouterApiKey" placeholder="הזן את מפתח OpenRouter API שלך"
-                           style="width: 100%; padding: 10px; border: 1px solid #a5d6a7; border-radius: 6px; margin-bottom: 10px;">
-                    <button type="button" onclick="saveOpenRouterApiKey()" style="width: 100%; padding: 10px; background: linear-gradient(135deg, #4caf50 0%, #45a049 100%); color: white; border: none; border-radius: 6px; cursor: pointer; font-weight: 600;">
-                        💾 שמור מפתח OpenRouter
-                    </button>
-                    <p style="font-size: 0.8em; color: #555; margin-top: 8px;">
-                        קבל מפתח API מ-<a href="https://openrouter.ai/keys" target="_blank" style="color: #2e7d32;">OpenRouter.ai</a> (נדרש לבדיקת כשרות AI)
-                    </p>
-                </div>
-
+                
                 <div class="form-row" style="margin-top: 15px; gap: 10px;">
                     <button type="button" class="settings-button save-button" onclick="saveSettings()">💾 שמור הגדרות</button>
                     <button type="button" class="settings-button clear-button" onclick="clearToDefault()">🔄 איפוס לברירת מחדל</button>
@@ -1731,15 +1716,6 @@
 
         // Auto-load kosher info for all visible cards
         async function autoLoadKosherInfo() {
-            const apiKey = getOpenRouterApiKey();
-            if (!apiKey) {
-                // Show message in all kosher info divs
-                document.querySelectorAll('.kosher-info').forEach(div => {
-                    div.innerHTML = '<div style="color: #ff9800;">⚠️ הזן מפתח OpenRouter בהגדרות למעלה לקבלת מידע כשרות</div>';
-                });
-                return;
-            }
-
             // Get all kosher info divs that haven't been loaded yet
             const kosherDivs = document.querySelectorAll('.kosher-info[data-place-name]');
 
@@ -1751,54 +1727,27 @@
                 const placeName = div.getAttribute('data-place-name');
                 const placeAddress = div.getAttribute('data-place-address');
 
-                // Load kosher info
-                await loadKosherInfoForDiv(div, placeName, placeAddress, apiKey);
+                // Load kosher info from backend
+                await loadKosherInfoForDiv(div, placeName, placeAddress);
 
                 // Small delay between requests to avoid rate limiting
                 if (i < kosherDivs.length - 1) {
-                    await new Promise(resolve => setTimeout(resolve, 300));
+                    await new Promise(resolve => setTimeout(resolve, 500));
                 }
             }
         }
 
-        async function loadKosherInfoForDiv(div, placeName, placeAddress, apiKey) {
+        async function loadKosherInfoForDiv(div, placeName, placeAddress) {
             try {
-                const prompt = `Search the web for information about this restaurant in Israel and provide kosher status:
-
-Restaurant: "${placeName}"
-Address: "${placeAddress}"
-
-Please search for:
-1. The restaurant's official website
-2. "${placeName} כשרות" (kosher certification)
-3. "${placeName} ${placeAddress}" reviews
-
-Based on your web search, provide in Hebrew:
-
-🔍 מקור המידע: [מאיפה מצאת את המידע - אתר רשמי/ביקורות/וכו']
-✡️ סטטוס כשרות: [כשר/לא כשר/לא נמצא מידע]
-📜 השגחה: [רבנות/בד"ץ/מהדרין/לא ידוע]
-🍽️ סוג: [בשרי/חלבי/פרווה/לא ידוע]
-🌐 אתר: [כתובת האתר אם נמצא]
-📞 טלפון: [אם נמצא]
-💡 מידע נוסף: [כל מידע רלוונטי שמצאת]
-
-If you cannot find specific kosher information, say so clearly. Be factual based on what you actually find online.
-Answer in Hebrew only.`;
-
-                const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+                const apiBaseUrl = getApiBaseUrl();
+                const response = await fetch(`${apiBaseUrl}/api/kosher-check`, {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
-                        'Authorization': `Bearer ${apiKey}`,
-                        'HTTP-Referer': window.location.origin,
-                        'X-Title': 'KREST Restaurant Finder'
                     },
                     body: JSON.stringify({
-                        model: 'perplexity/sonar-pro',
-                        messages: [{ role: 'user', content: prompt }],
-                        max_tokens: 1000,
-                        temperature: 0.3
+                        placeName: placeName,
+                        placeAddress: placeAddress
                     })
                 });
 
@@ -1807,9 +1756,12 @@ Answer in Hebrew only.`;
                 }
 
                 const data = await response.json();
-                const aiResponse = data.choices[0]?.message?.content || 'לא התקבל מידע';
 
-                displayKosherInfoInDiv(div, aiResponse, placeName);
+                if (!data.success) {
+                    throw new Error(data.error || 'Unknown error');
+                }
+
+                displayKosherInfoInDiv(div, data.kosherInfo, placeName);
                 div.classList.add('loaded');
 
             } catch (error) {
@@ -1981,7 +1933,6 @@ Answer in Hebrew only.`;
         // Load settings on page load
         window.addEventListener('DOMContentLoaded', () => {
             loadSettings();
-            loadOpenRouterApiKey();
             // Show API key section for mobile app
             if (typeof Capacitor !== 'undefined') {
                 showApiKeySection();
@@ -2102,30 +2053,7 @@ Answer in Hebrew only.`;
             }
         }
 
-        /**
-         * Show OpenRouter API key section
-         */
-        function showOpenRouterSection() {
-            const section = document.getElementById('openRouterSection');
-            if (section) {
-                section.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                section.style.animation = 'pulse 1s ease-in-out 3';
-            }
-        }
-
-        /**
-         * Load OpenRouter API key on page load
-         */
-        function loadOpenRouterApiKey() {
-            const savedKey = localStorage.getItem('openRouterApiKey');
-            if (savedKey) {
-                const input = document.getElementById('openRouterApiKey');
-                if (input) {
-                    input.value = savedKey;
-                }
-            }
-        }
-
+        
         /**
          * Show server status message to user
          */
@@ -2190,30 +2118,7 @@ Answer in Hebrew only.`;
             errorDiv.style.display = 'block';
         }
 
-        // OpenRouter API for Kosher Information
-        function getOpenRouterApiKey() {
-            return localStorage.getItem('openRouterApiKey') || '';
-        }
-
-        function saveOpenRouterApiKey() {
-            const apiKeyInput = document.getElementById('openRouterApiKey');
-            const apiKey = apiKeyInput.value.trim();
-            if (!apiKey) {
-                alert('נא להזין מפתח API');
-                return;
-            }
-            localStorage.setItem('openRouterApiKey', apiKey);
-            alert('✅ מפתח OpenRouter נשמר בהצלחה!');
-        }
-
-        async function checkKosherInfo(button, placeName, placeAddress) {
-            const apiKey = getOpenRouterApiKey();
-            if (!apiKey) {
-                alert('נא להזין מפתח OpenRouter API בהגדרות למטה');
-                showOpenRouterSection();
-                return;
-            }
-            // Find the kosher info div (next sibling of button)
+                    // Find the kosher info div (next sibling of button)
             const kosherInfoDiv = button.nextElementSibling;
 
             // If already showing, toggle off

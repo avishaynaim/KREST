@@ -25,6 +25,86 @@ app.get('/health', (req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
 });
 
+// Kosher info endpoint - uses OpenRouter API
+app.post('/api/kosher-check', async (req, res) => {
+  try {
+    const { placeName, placeAddress } = req.body;
+
+    if (!placeName || !placeAddress) {
+      return res.status(400).json({
+        success: false,
+        error: 'Missing placeName or placeAddress',
+      });
+    }
+
+    if (!config.openRouterApiKey) {
+      return res.status(500).json({
+        success: false,
+        error: 'OpenRouter API key not configured',
+      });
+    }
+
+    const prompt = `Search the web for information about this restaurant in Israel and provide kosher status:
+
+Restaurant: "${placeName}"
+Address: "${placeAddress}"
+
+Please search for:
+1. The restaurant's official website
+2. "${placeName} כשרות" (kosher certification)
+3. "${placeName} ${placeAddress}" reviews
+
+Based on your web search, provide in Hebrew:
+
+🔍 מקור המידע: [מאיפה מצאת את המידע - אתר רשמי/ביקורות/וכו']
+✡️ סטטוס כשרות: [כשר/לא כשר/לא נמצא מידע]
+📜 השגחה: [רבנות/בד"ץ/מהדרין/לא ידוע]
+🍽️ סוג: [בשרי/חלבי/פרווה/לא ידוע]
+🌐 אתר: [כתובת האתר אם נמצא]
+📞 טלפון: [אם נמצא]
+💡 מידע נוסף: [כל מידע רלוונטי שמצאת]
+
+If you cannot find specific kosher information, say so clearly. Be factual based on what you actually find online.
+Answer in Hebrew only.`;
+
+    const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${config.openRouterApiKey}`,
+        'HTTP-Referer': 'https://krest-production.up.railway.app',
+        'X-Title': 'KREST Restaurant Finder',
+      },
+      body: JSON.stringify({
+        model: 'perplexity/sonar-pro',
+        messages: [{ role: 'user', content: prompt }],
+        max_tokens: 1000,
+        temperature: 0.3,
+      }),
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error('OpenRouter API error:', response.status, errorText);
+      throw new Error(`OpenRouter API error: ${response.status}`);
+    }
+
+    const data = await response.json();
+    const aiResponse = data.choices[0]?.message?.content || 'לא התקבל מידע';
+
+    res.json({
+      success: true,
+      kosherInfo: aiResponse,
+    });
+  } catch (error) {
+    console.error('Kosher check error:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message,
+    });
+  }
+});
+
 // NEW: Adaptive Tiling Search endpoint (uses Google Places API New)
 app.get('/api/places/adaptive', rateLimitMiddleware, async (req, res) => {
   try {
