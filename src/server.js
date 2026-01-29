@@ -76,7 +76,7 @@ Answer in Hebrew only.`;
         'X-Title': 'KREST Restaurant Finder',
       },
       body: JSON.stringify({
-        model: 'google/gemini-2.0-flash-exp:free',
+        model: 'meta-llama/llama-3.2-3b-instruct:free',
         messages: [{ role: 'user', content: prompt }],
         max_tokens: 1000,
         temperature: 0.3,
