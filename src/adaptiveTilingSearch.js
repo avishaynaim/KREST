@@ -151,7 +151,7 @@ async function searchTileNearby(tile, includedTypes, apiKey) {
     const response = await axios.post(url, requestBody, {
       headers: {
         'X-Goog-Api-Key': apiKey,
-        'X-Goog-FieldMask': 'places.id,places.displayName,places.primaryType,places.location,places.formattedAddress,places.rating,places.userRatingCount,places.businessStatus,places.currentOpeningHours,places.regularOpeningHours,places.googleMapsUri',
+        'X-Goog-FieldMask': 'places.id,places.displayName,places.primaryType,places.location,places.formattedAddress,places.rating,places.userRatingCount,places.businessStatus,places.currentOpeningHours,places.regularOpeningHours,places.googleMapsUri,places.photos,places.websiteUri,places.priceLevel',
         'Content-Type': 'application/json',
       },
       timeout: ADAPTIVE_TILING_CONFIG.API_TIMEOUT,
@@ -249,6 +249,9 @@ export async function adaptiveTilingSearch(lat, lng, radiusMeters, includedTypes
           currentOpeningHours: place.currentOpeningHours,
           regularOpeningHours: place.regularOpeningHours,
           googleMapsUri: place.googleMapsUri,
+          photos: place.photos || [],
+          websiteUri: place.websiteUri || null,
+          priceLevel: place.priceLevel || null,
           discoveredInTile: tile.tileId,
         });
         newPlaces++;
@@ -314,7 +317,7 @@ export async function adaptiveTilingSearch(lat, lng, radiusMeters, includedTypes
  * INTEGRATION HELPER
  * Converts New API places to old format for compatibility
  */
-export function convertNewPlaceToOldFormat(newPlace, searchLat, searchLng) {
+export function convertNewPlaceToOldFormat(newPlace, searchLat, searchLng, apiKey) {
   const lat = newPlace.location?.latitude || 0;
   const lng = newPlace.location?.longitude || 0;
 
@@ -345,6 +348,26 @@ export function convertNewPlaceToOldFormat(newPlace, searchLat, searchLng) {
     googleMapsUrl = `https://www.google.com/maps/place/?q=place_id:${placeIdShort}&hl=he`;
   }
 
+  // Construct photo URLs from new API format
+  // New API returns photos with name like "places/xxx/photos/yyy"
+  const photoUrls = newPlace.photos?.map(photo => ({
+    url: photo.name && apiKey
+      ? `https://places.googleapis.com/v1/${photo.name}/media?maxHeightPx=400&key=${apiKey}`
+      : null,
+    width: photo.widthPx || 400,
+    height: photo.heightPx || 300,
+  })).filter(p => p.url) || [];
+
+  // Convert priceLevel from string to number (PRICE_LEVEL_INEXPENSIVE=1, etc.)
+  const priceLevelMap = {
+    'PRICE_LEVEL_FREE': 0,
+    'PRICE_LEVEL_INEXPENSIVE': 1,
+    'PRICE_LEVEL_MODERATE': 2,
+    'PRICE_LEVEL_EXPENSIVE': 3,
+    'PRICE_LEVEL_VERY_EXPENSIVE': 4,
+  };
+  const priceLevel = newPlace.priceLevel ? (priceLevelMap[newPlace.priceLevel] ?? null) : null;
+
   return {
     name: newPlace.name,
     address: newPlace.address || '',
@@ -356,10 +379,14 @@ export function convertNewPlaceToOldFormat(newPlace, searchLat, searchLng) {
     reviewCount: newPlace.reviewCount || 0,
     distance: distance,
     openingHours: openingHours,
+    phone: null, // New API doesn't include phone in searchNearby
+    photos: photoUrls,
+    website: newPlace.websiteUri || null,
+    priceLevel: priceLevel,
+    businessStatus: newPlace.status || 'OPERATIONAL',
     googleMapsUrl: googleMapsUrl,
     placeId: newPlace.id,
     type: newPlace.type,
-    status: newPlace.status,
   };
 }
 

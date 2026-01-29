@@ -1,5 +1,5 @@
 // Service Worker for Places Search PWA
-const CACHE_NAME = 'places-search-v1.3.0';
+const CACHE_NAME = 'places-search-v2.0.0';
 const urlsToCache = [
   '/',
   '/index.html',

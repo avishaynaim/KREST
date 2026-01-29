@@ -127,7 +127,7 @@ app.get('/api/places/adaptive', rateLimitMiddleware, async (req, res) => {
 
     // Convert to old format for compatibility
     const formattedPlaces = result.places.map(place =>
-      convertNewPlaceToOldFormat(place, location.latitude, location.longitude)
+      convertNewPlaceToOldFormat(place, location.latitude, location.longitude, config.googlePlacesApiKey)
     );
 
     // Sort ALL places by rating (highest first), then by review count
