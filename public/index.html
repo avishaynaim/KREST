@@ -935,7 +935,7 @@
             <p>מצא מסעדות ובתי קפה סגורים בשבת</p>
             <div style="margin-top: 10px;">
                 <span style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 6px 16px; border-radius: 20px; font-size: 0.85em; font-weight: 600; display: inline-block;">
-                    🎯 KREST v2.3.1 - Free AI Model
+                    🎯 KREST v2.4.0 - Graceful Errors
                 </span>
             </div>
         </div>
@@ -1743,6 +1743,9 @@
         async function loadKosherInfoForDiv(div, placeName, placeAddress) {
             try {
                 const apiBaseUrl = getApiBaseUrl();
+                const controller = new AbortController();
+                const timeoutId = setTimeout(() => controller.abort(), 15000); // 15 sec timeout
+
                 const response = await fetch(`${apiBaseUrl}/api/kosher-check`, {
                     method: 'POST',
                     headers: {
@@ -1751,8 +1754,11 @@
                     body: JSON.stringify({
                         placeName: placeName,
                         placeAddress: placeAddress
-                    })
+                    }),
+                    signal: controller.signal
                 });
+
+                clearTimeout(timeoutId);
 
                 if (!response.ok) {
                     throw new Error(`API error: ${response.status}`);
@@ -1769,7 +1775,8 @@
 
             } catch (error) {
                 console.error('Kosher info error:', error);
-                div.innerHTML = `<div style="color: #f44336;">❌ שגיאה בטעינת מידע כשרות</div>`;
+                // Show friendly message but don't break the app
+                div.innerHTML = `<div style="color: #999; font-size: 0.9em;">🕎 מידע כשרות לא זמין כרגע</div>`;
                 div.classList.add('loaded');
             }
         }
