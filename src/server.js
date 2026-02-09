@@ -63,6 +63,13 @@ function kosherRateLimit(req, res, next) {
   }
   next();
 }
+// Cleanup expired kosher rate limit entries every 30 minutes
+const kosherCleanupInterval = setInterval(() => {
+  const now = Date.now();
+  for (const [ip, data] of kosherCheckLimits.entries()) {
+    if (now - data.start > 3600000) kosherCheckLimits.delete(ip);
+  }
+}, 30 * 60 * 1000);
 
 // Kosher info endpoint - uses OpenRouter API
 app.post('/api/kosher-check', rateLimitMiddleware, kosherRateLimit, async (req, res) => {

@@ -11,6 +11,7 @@ const rateLimitStore = new Map();
 const RATE_LIMIT = 100; // requests per window
 const WINDOW_MS = 60 * 60 * 1000; // 1 hour in milliseconds
 const CLEANUP_INTERVAL_MS = 15 * 60 * 1000; // Cleanup every 15 minutes
+const MAX_STORE_SIZE = 10000; // Maximum IPs to track (prevents memory bloat)
 
 /**
  * Gets the client's IP address from the request
@@ -68,6 +69,11 @@ export function rateLimitMiddleware(req, res, next) {
   let rateLimitData = rateLimitStore.get(ip);
 
   if (!rateLimitData) {
+    // Evict oldest entries if store is at capacity
+    if (rateLimitStore.size >= MAX_STORE_SIZE) {
+      const firstKey = rateLimitStore.keys().next().value;
+      rateLimitStore.delete(firstKey);
+    }
     // First request from this IP
     rateLimitData = {
       count: 1,

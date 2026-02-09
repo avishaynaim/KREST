@@ -159,7 +159,7 @@ async function searchTileNearby(tile, includedTypes, apiKey) {
     });
 
     return {
-      places: response.data.places || [],
+      places: response.data?.places || [],
       tile: tile,
     };
   } catch (error) {

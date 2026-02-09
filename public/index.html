@@ -24,6 +24,36 @@
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
 
     <style>
+        :root {
+            --bg-gradient: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            --card-bg: white;
+            --card-shadow: 0 10px 40px rgba(0,0,0,0.1);
+            --text-primary: #333;
+            --text-secondary: #666;
+            --text-muted: #999;
+            --border-color: #e0e0e0;
+            --input-bg: white;
+            --hover-bg: #f0f7ff;
+            --hours-bg: #f9f9f9;
+            --saturday-bg: #fff3cd;
+            --kosher-bg: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+        }
+
+        [data-theme="dark"] {
+            --bg-gradient: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+            --card-bg: #1e1e2f;
+            --card-shadow: 0 10px 40px rgba(0,0,0,0.4);
+            --text-primary: #e0e0e0;
+            --text-secondary: #aaa;
+            --text-muted: #777;
+            --border-color: #333;
+            --input-bg: #2a2a3d;
+            --hover-bg: #2a2a3d;
+            --hours-bg: #252538;
+            --saturday-bg: #3d3520;
+            --kosher-bg: linear-gradient(135deg, #252538 0%, #1e1e2f 100%);
+        }
+
         * {
             margin: 0;
             padding: 0;
@@ -32,7 +62,7 @@
 
         body {
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            background: var(--bg-gradient);
             min-height: 100vh;
             padding: 20px;
         }
@@ -60,11 +90,12 @@
         }
 
         .search-card {
-            background: white;
+            background: var(--card-bg);
             border-radius: 16px;
             padding: 30px;
-            box-shadow: 0 10px 40px rgba(0,0,0,0.1);
+            box-shadow: var(--card-shadow);
             margin-bottom: 30px;
+            color: var(--text-primary);
         }
 
         .search-form {
@@ -86,16 +117,18 @@
         label {
             font-weight: 600;
             margin-bottom: 8px;
-            color: #333;
+            color: var(--text-primary);
             font-size: 0.9em;
         }
 
         input, select {
             padding: 12px;
-            border: 2px solid #e0e0e0;
+            border: 2px solid var(--border-color);
             border-radius: 8px;
             font-size: 1em;
             transition: border-color 0.3s;
+            background: var(--input-bg);
+            color: var(--text-primary);
         }
 
         input:focus, select:focus {
@@ -125,7 +158,7 @@
         }
 
         .search-button:disabled {
-            background: #ccc;
+            background: var(--border-color);
             cursor: not-allowed;
             transform: none;
         }
@@ -187,7 +220,7 @@
         }
 
         .location-button:disabled {
-            background: #ccc;
+            background: var(--border-color);
             cursor: not-allowed;
             transform: none;
         }
@@ -220,7 +253,7 @@
         }
 
         .map-modal-content {
-            background: white;
+            background: var(--card-bg);
             border-radius: 16px;
             width: 90%;
             max-width: 800px;
@@ -233,14 +266,14 @@
 
         .map-modal-header {
             padding: 20px;
-            border-bottom: 2px solid #e0e0e0;
+            border-bottom: 2px solid var(--border-color);
             display: flex;
             justify-content: space-between;
             align-items: center;
         }
 
         .map-modal-header h3 {
-            color: #333;
+            color: var(--text-primary);
             font-size: 1.5em;
         }
 
@@ -279,12 +312,13 @@
             top: 10px;
             left: 10px;
             right: 10px;
-            background: white;
+            background: var(--card-bg);
             padding: 15px;
             border-radius: 8px;
             box-shadow: 0 2px 10px rgba(0,0,0,0.2);
             z-index: 500;
             font-size: 0.95em;
+            color: var(--text-primary);
         }
 
         .map-button {
@@ -344,11 +378,12 @@
         }
 
         .results-header {
-            background: white;
+            background: var(--card-bg);
             border-radius: 16px;
             padding: 20px;
             margin-bottom: 20px;
-            box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+            box-shadow: var(--card-shadow);
+            color: var(--text-primary);
         }
 
         .results-info {
@@ -370,12 +405,12 @@
 
         .info-text {
             font-size: 0.9em;
-            color: #666;
+            color: var(--text-secondary);
         }
 
         .info-value {
             font-weight: 600;
-            color: #333;
+            color: var(--text-primary);
         }
 
         .places-table-container {
@@ -426,22 +461,22 @@
         }
 
         .places-table tbody tr {
-            border-bottom: 1px solid #e8e8e8;
+            border-bottom: 1px solid var(--border-color);
         }
 
         .places-table tbody tr:nth-child(even) {
-            background: #fafafa;
+            background: var(--hours-bg);
         }
 
         .places-table td {
             padding: 20px 18px;
             text-align: right;
             vertical-align: middle;
-            border-bottom: 1px solid #e8e8e8;
+            border-bottom: 1px solid var(--border-color);
         }
 
         .places-table tr:hover {
-            background: #f0f7ff !important;
+            background: var(--hover-bg) !important;
         }
 
         .places-table tr:last-child td {
@@ -464,7 +499,7 @@
         .table-name strong {
             display: block;
             font-weight: 600;
-            color: #333;
+            color: var(--text-primary);
             font-size: 1.05em;
             margin-bottom: 6px;
             line-height: 1.3;
@@ -474,7 +509,7 @@
             display: block;
             font-weight: 400;
             font-size: 0.9em;
-            color: #666;
+            color: var(--text-secondary);
             line-height: 1.5;
         }
 
@@ -493,21 +528,21 @@
 
         .table-rating-number {
             font-weight: 700;
-            color: #333;
+            color: var(--text-primary);
             font-size: 1.1em;
         }
 
         .table-reviews {
             text-align: center;
             font-weight: 600;
-            color: #555;
+            color: var(--text-secondary);
             width: 80px;
         }
 
         .table-distance {
             text-align: center;
             font-weight: 500;
-            color: #555;
+            color: var(--text-secondary);
             width: 90px;
         }
 
@@ -515,14 +550,14 @@
             direction: ltr;
             text-align: left;
             font-family: monospace;
-            color: #555;
+            color: var(--text-secondary);
             width: 130px;
         }
 
         .table-saturday {
             max-width: 180px;
             font-size: 0.9em;
-            color: #555;
+            color: var(--text-secondary);
             line-height: 1.4;
         }
 
@@ -552,11 +587,12 @@
         }
 
         .favorites-bar {
-            background: white;
+            background: var(--card-bg);
             border-radius: 12px;
             padding: 15px 20px;
             margin-bottom: 20px;
-            box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+            box-shadow: var(--card-shadow);
+            color: var(--text-primary);
             display: flex;
             align-items: center;
             justify-content: space-between;
@@ -655,11 +691,12 @@
         }
 
         .place-card {
-            background: white;
+            background: var(--card-bg);
             border-radius: 16px;
             padding: 25px;
-            box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+            box-shadow: var(--card-shadow);
             transition: transform 0.2s, box-shadow 0.2s;
+            color: var(--text-primary);
         }
 
         .place-card:hover {
@@ -677,7 +714,7 @@
         .place-name {
             font-size: 1.4em;
             font-weight: 700;
-            color: #333;
+            color: var(--text-primary);
             margin-bottom: 5px;
         }
 
@@ -695,7 +732,7 @@
         }
 
         .place-address {
-            color: #666;
+            color: var(--text-secondary);
             margin-bottom: 15px;
             font-size: 0.95em;
         }
@@ -715,11 +752,11 @@
 
         .rating-text {
             font-weight: 600;
-            color: #333;
+            color: var(--text-primary);
         }
 
         .reviews {
-            color: #666;
+            color: var(--text-secondary);
             font-size: 0.9em;
         }
 
@@ -728,7 +765,7 @@
             gap: 10px;
             margin-top: 15px;
             padding-top: 15px;
-            border-top: 1px solid #e0e0e0;
+            border-top: 1px solid var(--border-color);
         }
 
         .detail-item {
@@ -745,7 +782,7 @@
         }
 
         .detail-text {
-            color: #555;
+            color: var(--text-secondary);
         }
 
         .map-link {
@@ -767,7 +804,7 @@
         .kosher-info {
             margin-top: 15px;
             padding: 15px;
-            background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+            background: var(--kosher-bg);
             border-radius: 10px;
             border-right: 4px solid #4caf50;
         }
@@ -789,7 +826,7 @@
 
         .kosher-info-title {
             font-weight: 700;
-            color: #333;
+            color: var(--text-primary);
             margin-bottom: 10px;
             display: flex;
             align-items: center;
@@ -798,7 +835,7 @@
 
         .kosher-info-content {
             font-size: 0.95em;
-            color: #555;
+            color: var(--text-secondary);
             line-height: 1.6;
         }
 
@@ -844,7 +881,7 @@
         .hours-section {
             margin-top: 15px;
             padding-top: 15px;
-            border-top: 1px solid #e0e0e0;
+            border-top: 1px solid var(--border-color);
         }
 
         .hours-toggle {
@@ -866,7 +903,7 @@
         }
 
         .hours-toggle:hover {
-            background: #f5f5f5;
+            background: var(--hover-bg);
         }
 
         .hours-toggle-icon {
@@ -882,7 +919,7 @@
             display: block;
             margin-top: 10px;
             padding: 10px;
-            background: #f9f9f9;
+            background: var(--hours-bg);
             border-radius: 8px;
         }
 
@@ -894,7 +931,7 @@
             display: flex;
             justify-content: space-between;
             padding: 6px 0;
-            border-bottom: 1px solid #e0e0e0;
+            border-bottom: 1px solid var(--border-color);
             font-size: 0.9em;
         }
 
@@ -904,15 +941,15 @@
 
         .hours-day-name {
             font-weight: 600;
-            color: #555;
+            color: var(--text-secondary);
         }
 
         .hours-day-time {
-            color: #666;
+            color: var(--text-secondary);
         }
 
         .hours-day.saturday {
-            background: #fff3cd;
+            background: var(--saturday-bg);
             margin: 0 -10px;
             padding: 8px 10px;
             border-radius: 4px;
@@ -923,11 +960,11 @@
         }
 
         .sort-bar {
-            background: white;
+            background: var(--card-bg);
             border-radius: 12px;
             padding: 12px 20px;
             margin-bottom: 20px;
-            box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+            box-shadow: var(--card-shadow);
             display: flex;
             align-items: center;
             gap: 10px;
@@ -936,14 +973,14 @@
 
         .sort-bar-label {
             font-weight: 600;
-            color: #555;
+            color: var(--text-secondary);
             font-size: 0.9em;
             white-space: nowrap;
         }
 
         .sort-btn {
-            background: #f0f0f0;
-            color: #555;
+            background: var(--hours-bg);
+            color: var(--text-secondary);
             border: 2px solid transparent;
             padding: 8px 16px;
             border-radius: 20px;
@@ -956,7 +993,7 @@
         }
 
         .sort-btn:hover {
-            background: #e8e8e8;
+            background: var(--hover-bg);
         }
 
         .sort-btn.active {
@@ -968,6 +1005,68 @@
         .sort-btn .sort-arrow {
             margin-right: 4px;
             font-size: 0.9em;
+        }
+
+        .search-history {
+            background: var(--card-bg);
+            border-radius: 12px;
+            padding: 12px 16px;
+            margin-bottom: 20px;
+            box-shadow: var(--card-shadow);
+        }
+
+        .search-history-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 8px;
+        }
+
+        .search-history-header span {
+            font-weight: 600;
+            color: var(--text-secondary);
+            font-size: 0.9em;
+        }
+
+        .search-history-clear {
+            background: none;
+            border: none;
+            color: var(--text-muted);
+            font-size: 0.8em;
+            cursor: pointer;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-family: inherit;
+        }
+
+        .search-history-clear:hover {
+            color: #f44336;
+            background: #ffeaea;
+        }
+
+        .search-history-items {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
+
+        .history-chip {
+            background: var(--hours-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 20px;
+            padding: 6px 14px;
+            font-size: 0.85em;
+            cursor: pointer;
+            transition: all 0.2s;
+            white-space: nowrap;
+            color: var(--text-primary);
+            font-family: inherit;
+        }
+
+        .history-chip:hover {
+            background: #667eea;
+            color: white;
+            border-color: #667eea;
         }
 
         .export-btn {
@@ -1022,11 +1121,12 @@
         }
 
         .no-results {
-            background: white;
+            background: var(--card-bg);
             border-radius: 16px;
             padding: 40px;
             text-align: center;
-            box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+            box-shadow: var(--card-shadow);
+            color: var(--text-primary);
         }
 
         .no-results-icon {
@@ -1036,12 +1136,12 @@
 
         .no-results h3 {
             font-size: 1.5em;
-            color: #333;
+            color: var(--text-primary);
             margin-bottom: 10px;
         }
 
         .no-results p {
-            color: #666;
+            color: var(--text-secondary);
             margin-bottom: 20px;
         }
 
@@ -1059,7 +1159,7 @@
         }
 
         .rate-limit {
-            background: white;
+            background: var(--card-bg);
             border-radius: 8px;
             padding: 15px;
             margin-top: 20px;
@@ -1078,6 +1178,62 @@
 
         .rate-limit-low {
             color: #f44336;
+        }
+
+        .scroll-top-btn {
+            position: fixed;
+            bottom: 30px;
+            left: 30px;
+            width: 48px;
+            height: 48px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            font-size: 1.4em;
+            cursor: pointer;
+            box-shadow: 0 4px 15px rgba(102, 126, 234, 0.5);
+            transition: transform 0.2s, opacity 0.3s;
+            opacity: 0;
+            pointer-events: none;
+            z-index: 999;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .scroll-top-btn.visible {
+            opacity: 1;
+            pointer-events: auto;
+        }
+
+        .scroll-top-btn:hover {
+            transform: scale(1.1);
+        }
+
+        .theme-toggle {
+            position: fixed;
+            top: 20px;
+            left: 20px;
+            width: 44px;
+            height: 44px;
+            border-radius: 50%;
+            background: rgba(255,255,255,0.2);
+            backdrop-filter: blur(10px);
+            border: 2px solid rgba(255,255,255,0.3);
+            color: white;
+            font-size: 1.3em;
+            cursor: pointer;
+            z-index: 1000;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: transform 0.2s, background 0.2s;
+        }
+
+        .theme-toggle:hover {
+            transform: scale(1.1);
+            background: rgba(255,255,255,0.3);
         }
 
         @media (max-width: 768px) {
@@ -1134,13 +1290,14 @@
     </style>
 </head>
 <body>
+    <button type="button" class="theme-toggle" id="themeToggle" title="מצב כהה / בהיר" aria-label="Toggle dark mode">🌙</button>
     <div class="container">
         <div class="header">
             <h1>🔍 מערכת חיפוש מסעדות</h1>
             <p>מצא מסעדות ובתי קפה סגורים בשבת</p>
             <div style="margin-top: 10px;">
                 <span style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 6px 16px; border-radius: 20px; font-size: 0.85em; font-weight: 600; display: inline-block;">
-                    🎯 KREST v2.6.0 - Code Quality & Accessibility
+                    🎯 KREST v2.7.0 - Dark Mode & Polish
                 </span>
             </div>
         </div>
@@ -1285,6 +1442,14 @@
             </form>
         </div>
 
+        <div class="search-history" id="searchHistory" style="display: none;">
+            <div class="search-history-header">
+                <span>🕐 חיפושים אחרונים</span>
+                <button class="search-history-clear" onclick="clearSearchHistory()">נקה הכל</button>
+            </div>
+            <div class="search-history-items" id="searchHistoryItems"></div>
+        </div>
+
         <div class="favorites-bar" id="favoritesBar" style="display: none;">
             <div>
                 <span class="favorites-count" id="favCount">0</span>
@@ -1306,6 +1471,9 @@
     </div>
 
     <!-- Map Modal -->
+    <!-- Scroll to top button -->
+    <button class="scroll-top-btn" id="scrollTopBtn" onclick="window.scrollTo({top:0, behavior:'smooth'})" title="חזור למעלה">↑</button>
+
     <div id="mapModal" class="map-modal">
         <div class="map-modal-content">
             <div class="map-modal-header">
@@ -1348,6 +1516,8 @@
         let currentSortColumn = 'rating';
         let currentSortDirection = 'desc';
         let currentLocation = null; // Store current GPS location
+        let kosherLoadTimer = null; // Track kosher info loading timeout
+        let kosherLoadGeneration = 0; // Generation counter to cancel stale loads
 
         // Map variables
         let map = null;
@@ -1672,6 +1842,17 @@
                 // Store raw data from server
                 searchData = data;
                 allPlacesRaw = data.places || [];
+
+                // Save to search history
+                saveSearchToHistory({
+                    city: currentLocation ? '' : city,
+                    lat: currentLocation?.latitude,
+                    lng: currentLocation?.longitude,
+                    radius: radius,
+                    rating: rating,
+                    reviews: reviews,
+                    type: type
+                });
 
                 // Apply client-side filters
                 applyClientFilters();
@@ -2170,9 +2351,12 @@
                 results.scrollIntoView({ behavior: 'smooth', block: 'start' });
             }
 
-            // Auto-load kosher info for visible cards
-            setTimeout(() => {
-                autoLoadKosherInfo();
+            // Auto-load kosher info for visible cards (cancel previous)
+            if (kosherLoadTimer) clearTimeout(kosherLoadTimer);
+            kosherLoadGeneration++;
+            const thisGeneration = kosherLoadGeneration;
+            kosherLoadTimer = setTimeout(() => {
+                autoLoadKosherInfo(thisGeneration);
             }, 500);
         }
 
@@ -2202,7 +2386,7 @@
         }
 
         // Auto-load kosher info for all visible cards - PARALLEL loading
-        async function autoLoadKosherInfo() {
+        async function autoLoadKosherInfo(generation) {
             // Get all kosher info divs that haven't been loaded yet
             const kosherDivs = document.querySelectorAll('.kosher-info[data-place-name]:not(.loaded)');
 
@@ -2211,6 +2395,9 @@
             const divArray = Array.from(kosherDivs);
 
             for (let i = 0; i < divArray.length; i += batchSize) {
+                // Stop if a newer search/sort has started
+                if (generation !== kosherLoadGeneration) return;
+
                 const batch = divArray.slice(i, i + batchSize);
 
                 // Load batch in parallel
@@ -2634,6 +2821,84 @@
             errorDiv.style.display = 'block';
         }
 
+        // ===== SEARCH HISTORY =====
+        const MAX_HISTORY = 8;
+
+        function getSearchHistory() {
+            try { return JSON.parse(localStorage.getItem('krestSearchHistory') || '[]'); }
+            catch { return []; }
+        }
+
+        function saveSearchToHistory(params) {
+            const label = params.city || `${params.lat?.toFixed(3)}, ${params.lng?.toFixed(3)}`;
+            const entry = {
+                label: label,
+                city: params.city || '',
+                lat: params.lat || null,
+                lng: params.lng || null,
+                radius: params.radius,
+                rating: params.rating,
+                reviews: params.reviews,
+                type: params.type,
+                ts: Date.now()
+            };
+
+            let history = getSearchHistory();
+            // Remove duplicate (same city or same coords)
+            history = history.filter(h => h.label !== entry.label);
+            history.unshift(entry);
+            if (history.length > MAX_HISTORY) history = history.slice(0, MAX_HISTORY);
+            localStorage.setItem('krestSearchHistory', JSON.stringify(history));
+            renderSearchHistory();
+        }
+
+        function renderSearchHistory() {
+            const history = getSearchHistory();
+            const container = document.getElementById('searchHistory');
+            const items = document.getElementById('searchHistoryItems');
+
+            if (history.length === 0) {
+                container.style.display = 'none';
+                return;
+            }
+
+            container.style.display = 'block';
+            items.innerHTML = history.map((h, i) =>
+                `<button class="history-chip" onclick="replaySearch(${i})" title="${escapeHtml(h.label)} - ${h.radius}ק&quot;מ">${escapeHtml(h.label)} (${h.radius}ק"מ)</button>`
+            ).join('');
+        }
+
+        function replaySearch(index) {
+            const history = getSearchHistory();
+            const entry = history[index];
+            if (!entry) return;
+
+            // Fill form with saved values
+            if (entry.city) {
+                document.getElementById('city').value = entry.city;
+                currentLocation = null;
+            } else if (entry.lat && entry.lng) {
+                currentLocation = { latitude: entry.lat, longitude: entry.lng };
+                document.getElementById('city').value = '';
+                const locationStatus = document.getElementById('locationStatus');
+                locationStatus.style.display = 'block';
+                locationStatus.textContent = `${entry.lat.toFixed(4)}, ${entry.lng.toFixed(4)}`;
+                locationStatus.style.color = '#4caf50';
+            }
+            if (entry.radius) document.getElementById('radius').value = entry.radius;
+            if (entry.rating) document.getElementById('rating').value = entry.rating;
+            if (entry.reviews) document.getElementById('reviews').value = entry.reviews;
+            if (entry.type) document.getElementById('type').value = entry.type;
+
+            // Trigger search
+            document.getElementById('searchForm').dispatchEvent(new Event('submit'));
+        }
+
+        function clearSearchHistory() {
+            localStorage.removeItem('krestSearchHistory');
+            renderSearchHistory();
+        }
+
         // ===== EXPORT TO CSV =====
         function exportToCSV() {
             if (!allPlaces || allPlaces.length === 0) {
@@ -2918,9 +3183,48 @@
             }
         }
 
-        // Initialize favorites bar on load
+        // Dark mode toggle
+        function initTheme() {
+            const saved = localStorage.getItem('krest-theme');
+            if (saved === 'dark') {
+                document.documentElement.setAttribute('data-theme', 'dark');
+                document.getElementById('themeToggle').textContent = '☀️';
+            }
+        }
+
+        function toggleTheme() {
+            const html = document.documentElement;
+            const btn = document.getElementById('themeToggle');
+            if (html.getAttribute('data-theme') === 'dark') {
+                html.removeAttribute('data-theme');
+                btn.textContent = '🌙';
+                localStorage.setItem('krest-theme', 'light');
+            } else {
+                html.setAttribute('data-theme', 'dark');
+                btn.textContent = '☀️';
+                localStorage.setItem('krest-theme', 'dark');
+            }
+        }
+
+        document.getElementById('themeToggle').addEventListener('click', toggleTheme);
+
+        // Initialize theme before paint
+        initTheme();
+
+        // Initialize favorites bar and search history on load
         window.addEventListener('DOMContentLoaded', () => {
             updateFavoritesBar();
+            renderSearchHistory();
+        });
+
+        // Scroll-to-top button visibility
+        window.addEventListener('scroll', () => {
+            const btn = document.getElementById('scrollTopBtn');
+            if (window.scrollY > 400) {
+                btn.classList.add('visible');
+            } else {
+                btn.classList.remove('visible');
+            }
         });
 
         // Register Service Worker for PWA functionality
