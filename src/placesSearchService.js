@@ -1,39 +1,11 @@
 import { googleMapsClient, apiKey } from './placesClient.js';
 import { config } from './config.js';
-import { appendFileSync, writeFileSync } from 'fs';
+import { appendFile, writeFile } from 'fs/promises';
 import { join } from 'path';
+import { calculateDistance } from './geoUtils.js';
 
-/**
- * Calculates distance between two coordinates using Haversine formula
- * @param {number} lat1 - Latitude of first point
- * @param {number} lng1 - Longitude of first point
- * @param {number} lat2 - Latitude of second point
- * @param {number} lng2 - Longitude of second point
- * @returns {number} Distance in kilometers
- */
-export function calculateDistance(lat1, lng1, lat2, lng2) {
-  const R = 6371; // Earth's radius in kilometers
-  const dLat = toRadians(lat2 - lat1);
-  const dLng = toRadians(lng2 - lng1);
-
-  const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-            Math.cos(toRadians(lat1)) * Math.cos(toRadians(lat2)) *
-            Math.sin(dLng / 2) * Math.sin(dLng / 2);
-
-  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-  const distance = R * c;
-
-  return Math.round(distance * 100) / 100; // Round to 2 decimal places
-}
-
-/**
- * Converts degrees to radians
- * @param {number} degrees
- * @returns {number} Radians
- */
-function toRadians(degrees) {
-  return degrees * (Math.PI / 180);
-}
+// Re-export for consumers
+export { calculateDistance };
 
 /**
  * Format opening hours from periods array to 24-hour format strings
@@ -274,7 +246,7 @@ export async function searchPlaces({ latitude, longitude, radius, minRating, min
   console.log(`Open Now: ${opennow !== undefined ? opennow : 'not set'}`);
   console.log('========================\n');
 
-  // Clear log file at start of search
+  // Debug log file (concurrent writes are handled gracefully - append is atomic for small writes)
   const logPath = join(process.cwd(), 'google-api-debug.log');
   try {
     const header = `SEARCH STARTED: ${new Date().toISOString()}\n` +
@@ -284,7 +256,7 @@ export async function searchPlaces({ latitude, longitude, radius, minRating, min
       `Open Now: ${opennow !== undefined ? opennow : 'not set'}\n` +
       `Filter Closed Saturday: ${filterClosedSaturday}\n` +
       `${'='.repeat(80)}\n\n`;
-    writeFileSync(logPath, header);
+    await writeFile(logPath, header);
   } catch (err) {
     console.error('Failed to clear log file:', err.message);
   }
@@ -352,7 +324,7 @@ export async function searchPlaces({ latitude, longitude, radius, minRating, min
         // Also write request params to log file
         try {
           const requestLog = `REQUEST (${placeType} page ${pageCount + 1}):\n${JSON.stringify(paramsForLog, null, 2)}\n\n`;
-          appendFileSync(logPath, requestLog);
+          await appendFile(logPath, requestLog);
         } catch (err) {
           console.error('Failed to write request to log file:', err.message);
         }
@@ -369,21 +341,21 @@ export async function searchPlaces({ latitude, longitude, radius, minRating, min
         // File: Log only place names and ranks
         const places = response.data.results || [];
         try {
+          let logBatch = '';
           places.forEach((place, index) => {
             const rank = allPlaces.length + index + 1;
             const rating = place.rating || 'N/A';
             const reviews = place.user_ratings_total || 0;
-            const logLine = `${rank}\t${rating}\t${reviews}\t${place.name}\n`;
-            appendFileSync(logPath, logLine);
+            logBatch += `${rank}\t${rating}\t${reviews}\t${place.name}\n`;
           });
 
           // Log next_page_token info after each page
-          const tokenInfo = `\nRESPONSE (${placeType} page ${pageCount + 1}):\n` +
+          logBatch += `\nRESPONSE (${placeType} page ${pageCount + 1}):\n` +
             `  Status: ${response.data.status}\n` +
             `  Results this page: ${places.length}\n` +
             `  next_page_token exists: ${!!response.data.next_page_token}\n` +
             `  next_page_token value: ${response.data.next_page_token || 'NONE'}\n\n`;
-          appendFileSync(logPath, tokenInfo);
+          await appendFile(logPath, logBatch);
         } catch (err) {
           console.error('Failed to write to log file:', err.message);
         }

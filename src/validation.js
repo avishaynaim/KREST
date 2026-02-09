@@ -158,7 +158,11 @@ export function validateLocation(city, latitude, longitude) {
     return { valid: true, latitude: lat, longitude: lng, city: hasCity ? city : undefined };
   }
 
-  // Only city provided
+  // Only city provided - validate length
+  if (city.length > 100) {
+    return { valid: false, error: 'City name must be 100 characters or less' };
+  }
+
   return { valid: true, city };
 }
 

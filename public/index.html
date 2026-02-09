@@ -855,9 +855,14 @@
             color: #667eea;
             font-weight: 600;
             padding: 8px;
+            border: none;
+            background: none;
             border-radius: 6px;
             transition: background 0.2s;
             user-select: none;
+            font-size: inherit;
+            font-family: inherit;
+            width: 100%;
         }
 
         .hours-toggle:hover {
@@ -915,6 +920,77 @@
 
         .hours-day.saturday .hours-day-name {
             color: #856404;
+        }
+
+        .sort-bar {
+            background: white;
+            border-radius: 12px;
+            padding: 12px 20px;
+            margin-bottom: 20px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+
+        .sort-bar-label {
+            font-weight: 600;
+            color: #555;
+            font-size: 0.9em;
+            white-space: nowrap;
+        }
+
+        .sort-btn {
+            background: #f0f0f0;
+            color: #555;
+            border: 2px solid transparent;
+            padding: 8px 16px;
+            border-radius: 20px;
+            font-size: 0.85em;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+            white-space: nowrap;
+            font-family: inherit;
+        }
+
+        .sort-btn:hover {
+            background: #e8e8e8;
+        }
+
+        .sort-btn.active {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border-color: transparent;
+        }
+
+        .sort-btn .sort-arrow {
+            margin-right: 4px;
+            font-size: 0.9em;
+        }
+
+        .export-btn {
+            background: linear-gradient(135deg, #43a047 0%, #2e7d32 100%);
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 8px;
+            font-size: 0.9em;
+            font-weight: 600;
+            cursor: pointer;
+            transition: transform 0.2s, box-shadow 0.2s;
+            white-space: nowrap;
+            font-family: inherit;
+        }
+
+        .export-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 15px rgba(67, 160, 71, 0.4);
+        }
+
+        .export-btn:active {
+            transform: translateY(0);
         }
 
         .show-more-container {
@@ -1064,7 +1140,7 @@
             <p>מצא מסעדות ובתי קפה סגורים בשבת</p>
             <div style="margin-top: 10px;">
                 <span style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 6px 16px; border-radius: 20px; font-size: 0.85em; font-weight: 600; display: inline-block;">
-                    🎯 KREST v2.5.0 - Security & UX Fixes
+                    🎯 KREST v2.6.0 - Code Quality & Accessibility
                 </span>
             </div>
         </div>
@@ -1507,7 +1583,7 @@
             currentOffset = 0;
 
             // Get form values
-            const city = document.getElementById('city').value;
+            const city = document.getElementById('city').value.trim();
             const radius = document.getElementById('radius').value;
             const rating = document.getElementById('rating').value;
             const reviews = document.getElementById('reviews').value;
@@ -1519,6 +1595,13 @@
             // Check if we have location or city
             if (!currentLocation && !city) {
                 errorDiv.textContent = '❌ אנא הזן שם עיר או השתמש במיקום הנוכחי';
+                errorDiv.classList.add('active');
+                return;
+            }
+
+            // Validate city length
+            if (city && city.length > 100) {
+                errorDiv.textContent = '❌ שם העיר ארוך מדי (מקסימום 100 תווים)';
                 errorDiv.classList.add('active');
                 return;
             }
@@ -1858,6 +1941,7 @@
 
 
         function displayResults(append = false) {
+            if (!searchData) return;
             const { location, filters } = searchData;
             const count = allPlaces.length;
             const totalFetched = allPlacesRaw.length;
@@ -1915,6 +1999,9 @@
                             </div>
                         </div>
                         ${filterBadges}
+                        <div style="margin-top: 12px;">
+                            <button class="export-btn" onclick="exportToCSV()">📥 ייצוא ל-CSV</button>
+                        </div>
                     </div>
                 `;
             }
@@ -1928,6 +2015,26 @@
                     </div>
                 `;
             } else {
+                // Add sort bar (only on initial display, not append)
+                if (!append) {
+                    const sortOptions = [
+                        { key: 'rating', label: 'דירוג', icon: '⭐' },
+                        { key: 'reviewCount', label: 'ביקורות', icon: '💬' },
+                        { key: 'distance', label: 'מרחק', icon: '📏' },
+                        { key: 'name', label: 'שם', icon: '🔤' },
+                    ];
+                    html += `<div class="sort-bar">
+                        <span class="sort-bar-label">🔃 מיון:</span>`;
+                    for (const opt of sortOptions) {
+                        const isActive = currentSortColumn === opt.key;
+                        const arrow = isActive ? (currentSortDirection === 'asc' ? '↑' : '↓') : '';
+                        html += `<button class="sort-btn ${isActive ? 'active' : ''}" onclick="sortResults('${opt.key}')">
+                            ${arrow ? `<span class="sort-arrow">${arrow}</span>` : ''}${opt.icon} ${opt.label}
+                        </button>`;
+                    }
+                    html += `</div>`;
+                }
+
                 // Get the places to display
                 const endIndex = currentOffset + resultsPerPage;
                 const placesToShow = allPlaces.slice(currentOffset, endIndex);
@@ -2008,10 +2115,10 @@
                             </div>
 
                             <div class="hours-section">
-                                <div class="hours-toggle expanded" onclick="toggleHours(this)">
+                                <button type="button" class="hours-toggle expanded" onclick="toggleHours(this)">
                                     <span class="hours-toggle-icon">▼</span>
                                     <span>שעות פתיחה</span>
-                                </div>
+                                </button>
                                 <div class="hours-list">
                                     ${hoursHtml}
                                 </div>
@@ -2067,6 +2174,31 @@
             setTimeout(() => {
                 autoLoadKosherInfo();
             }, 500);
+        }
+
+        function sortResults(column) {
+            // Toggle direction if same column, otherwise default desc (asc for name/distance)
+            if (currentSortColumn === column) {
+                currentSortDirection = currentSortDirection === 'asc' ? 'desc' : 'asc';
+            } else {
+                currentSortColumn = column;
+                currentSortDirection = (column === 'name' || column === 'distance') ? 'asc' : 'desc';
+            }
+
+            allPlaces.sort((a, b) => {
+                let valA, valB;
+                if (column === 'name') {
+                    valA = (a.name || '').toLowerCase();
+                    valB = (b.name || '').toLowerCase();
+                    return currentSortDirection === 'asc' ? valA.localeCompare(valB, 'he') : valB.localeCompare(valA, 'he');
+                }
+                valA = a[column] || 0;
+                valB = b[column] || 0;
+                return currentSortDirection === 'asc' ? valA - valB : valB - valA;
+            });
+
+            currentOffset = 0;
+            displayResults(false);
         }
 
         // Auto-load kosher info for all visible cards - PARALLEL loading
@@ -2211,8 +2343,12 @@
 
             localStorage.setItem('placeSearchSettings', JSON.stringify(settings));
 
-            // Show success message
+            // Remove any existing status message before adding new one
+            const existing = form.querySelector('.settings-status-msg');
+            if (existing) existing.remove();
+
             const successMsg = document.createElement('div');
+            successMsg.className = 'settings-status-msg';
             successMsg.textContent = '✓ הגדרות נשמרו בהצלחה!';
             successMsg.style.color = '#4caf50';
             successMsg.style.fontSize = '0.9em';
@@ -2292,8 +2428,12 @@
             locationStatus.style.display = 'none';
             locationStatus.textContent = '';
 
-            // Show success message
+            // Remove any existing status message before adding new one
+            const existing = form.querySelector('.settings-status-msg');
+            if (existing) existing.remove();
+
             const resetMsg = document.createElement('div');
+            resetMsg.className = 'settings-status-msg';
             resetMsg.textContent = '✓ הגדרות אופסו לברירת מחדל!';
             resetMsg.style.color = '#ff9800';
             resetMsg.style.fontSize = '0.9em';
@@ -2494,6 +2634,60 @@
             errorDiv.style.display = 'block';
         }
 
+        // ===== EXPORT TO CSV =====
+        function exportToCSV() {
+            if (!allPlaces || allPlaces.length === 0) {
+                showToast('אין תוצאות לייצוא');
+                return;
+            }
+
+            // BOM for Excel Hebrew support
+            const BOM = '\uFEFF';
+
+            // CSV header
+            const headers = ['#', 'שם', 'כתובת', 'דירוג', 'ביקורות', 'מרחק (ק"מ)', 'טלפון', 'שבת', 'קישור למפות'];
+
+            // Escape CSV field (handle commas, quotes, newlines)
+            const csvEscape = (val) => {
+                if (val == null) return '';
+                const str = String(val);
+                if (str.includes(',') || str.includes('"') || str.includes('\n')) {
+                    return '"' + str.replace(/"/g, '""') + '"';
+                }
+                return str;
+            };
+
+            const rows = allPlaces.map((place, i) => {
+                const saturdayHours = place.openingHours?.[6] || '';
+                const saturdayClean = saturdayHours.replace(/Saturday:|שבת:/gi, '').trim();
+                return [
+                    i + 1,
+                    csvEscape(place.name),
+                    csvEscape(place.address),
+                    place.rating?.toFixed(1) || '0',
+                    place.reviewCount || 0,
+                    place.distance?.toFixed(2) || '',
+                    csvEscape(place.phone || ''),
+                    csvEscape(saturdayClean || 'לא ידוע'),
+                    csvEscape(place.googleMapsUrl || '')
+                ].join(',');
+            });
+
+            const csvContent = BOM + headers.join(',') + '\n' + rows.join('\n');
+            const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+            const url = URL.createObjectURL(blob);
+
+            const link = document.createElement('a');
+            link.href = url;
+            const timestamp = new Date().toISOString().slice(0, 10);
+            const locationName = searchData?.location?.formattedAddress?.split(',')[0] || 'results';
+            link.download = `krest-${locationName}-${timestamp}.csv`;
+            link.click();
+
+            URL.revokeObjectURL(url);
+            showToast('קובץ CSV הורד בהצלחה!');
+        }
+
         // ===== SHARE FEATURE =====
         async function sharePlace(index) {
             const place = allPlaces[index];
@@ -2521,16 +2715,7 @@
                 await navigator.clipboard.writeText(text);
                 showToast('הועתק ללוח!');
             } catch {
-                // Last resort fallback
-                const textarea = document.createElement('textarea');
-                textarea.value = text;
-                textarea.style.position = 'fixed';
-                textarea.style.opacity = '0';
-                document.body.appendChild(textarea);
-                textarea.select();
-                document.execCommand('copy');
-                document.body.removeChild(textarea);
-                showToast('הועתק ללוח!');
+                showToast('לא ניתן להעתיק ללוח');
             }
         }
 
@@ -2705,6 +2890,7 @@
             let text = `❤️ המועדפים שלי (${favs.length} מקומות)\n\n`;
             favs.forEach((p, i) => {
                 text += `${i + 1}. ${p.name} - ${'⭐'.repeat(Math.round(p.rating || 0))} ${(p.rating || 0).toFixed(1)}\n   📍 ${p.address}\n`;
+                if (p.phone) text += `   📞 ${p.phone}\n`;
                 if (p.googleMapsUrl) text += `   🗺️ ${p.googleMapsUrl}\n`;
                 text += '\n';
             });

@@ -2,7 +2,6 @@ import express from 'express';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
 import { config } from './config.js';
-import { googleMapsClient } from './placesClient.js';
 import { processLocation } from './locationService.js';
 import { searchPlaces } from './placesSearchService.js';
 import { validateQueryParameters } from './validation.js';
@@ -15,7 +14,7 @@ const __dirname = dirname(__filename);
 const app = express();
 
 // Middleware
-app.use(express.json());
+app.use(express.json({ limit: '100kb' }));
 
 // CORS support
 app.use((req, res, next) => {
@@ -48,8 +47,25 @@ function requireApiKey(req, res, next) {
   next();
 }
 
+// Kosher-check specific rate limit (20 per hour per IP, protects OpenRouter quota)
+const kosherCheckLimits = new Map();
+function kosherRateLimit(req, res, next) {
+  const ip = req.headers['x-forwarded-for']?.split(',')[0]?.trim() || req.socket.remoteAddress || 'unknown';
+  const now = Date.now();
+  const data = kosherCheckLimits.get(ip);
+  if (!data || now - data.start > 3600000) {
+    kosherCheckLimits.set(ip, { count: 1, start: now });
+  } else {
+    data.count++;
+    if (data.count > 20) {
+      return res.status(429).json({ success: false, error: 'Kosher check rate limit exceeded. Max 20 per hour.' });
+    }
+  }
+  next();
+}
+
 // Kosher info endpoint - uses OpenRouter API
-app.post('/api/kosher-check', rateLimitMiddleware, async (req, res) => {
+app.post('/api/kosher-check', rateLimitMiddleware, kosherRateLimit, async (req, res) => {
   try {
     const { placeName, placeAddress } = req.body;
 
@@ -98,21 +114,30 @@ Based on your web search, provide in Hebrew:
 If you cannot find specific kosher information, say so clearly. Be factual based on what you actually find online.
 Answer in Hebrew only.`;
 
-    const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${config.openRouterApiKey}`,
-        'HTTP-Referer': 'https://krest-production.up.railway.app',
-        'X-Title': 'KREST Restaurant Finder',
-      },
-      body: JSON.stringify({
-        model: 'openai/gpt-4o-mini',
-        messages: [{ role: 'user', content: prompt }],
-        max_tokens: 1000,
-        temperature: 0.3,
-      }),
-    });
+    const fetchController = new AbortController();
+    const fetchTimeout = setTimeout(() => fetchController.abort(), 30000); // 30 second timeout
+
+    let response;
+    try {
+      response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${config.openRouterApiKey}`,
+          'HTTP-Referer': 'https://krest-production.up.railway.app',
+          'X-Title': 'KREST Restaurant Finder',
+        },
+        body: JSON.stringify({
+          model: 'openai/gpt-4o-mini',
+          messages: [{ role: 'user', content: prompt }],
+          max_tokens: 1000,
+          temperature: 0.3,
+        }),
+        signal: fetchController.signal,
+      });
+    } finally {
+      clearTimeout(fetchTimeout);
+    }
 
     if (!response.ok) {
       const errorText = await response.text();
@@ -129,9 +154,10 @@ Answer in Hebrew only.`;
     });
   } catch (error) {
     console.error('Kosher check error:', error);
-    res.status(500).json({
+    const isTimeout = error.name === 'AbortError';
+    res.status(isTimeout ? 504 : 500).json({
       success: false,
-      error: error.message,
+      error: isTimeout ? 'Kosher check request timed out' : 'Failed to check kosher information',
     });
   }
 });
@@ -308,7 +334,7 @@ app.get('/api/places/adaptive', rateLimitMiddleware, requireApiKey, async (req, 
     res.status(500).json({
       success: false,
       error: 'ADAPTIVE_SEARCH_ERROR',
-      message: error.message,
+      message: 'Search failed. Please try again with different parameters.',
     });
   }
 });
@@ -507,7 +533,7 @@ app.get('/api/places', rateLimitMiddleware, requireApiKey, async (req, res) => {
 
     res.status(statusCode).json({
       success: false,
-      error: error.message,
+      error: statusCode === 400 ? error.message : 'Search failed. Please try again.',
     });
   }
 });

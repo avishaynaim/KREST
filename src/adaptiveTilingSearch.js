@@ -1,5 +1,6 @@
 import axios from 'axios';
 import { config } from './config.js';
+import { calculateDistance } from './geoUtils.js';
 
 /**
  * ADAPTIVE TILING ALGORITHM FOR GOOGLE PLACES API (NEW)
@@ -363,23 +364,6 @@ export function convertNewPlaceToOldFormat(newPlace, searchLat, searchLng) {
   };
 }
 
-function calculateDistance(lat1, lng1, lat2, lng2) {
-  const R = 6371; // Earth's radius in km
-  const dLat = toRadians(lat2 - lat1);
-  const dLng = toRadians(lng2 - lng1);
-
-  const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-            Math.cos(toRadians(lat1)) * Math.cos(toRadians(lat2)) *
-            Math.sin(dLng / 2) * Math.sin(dLng / 2);
-
-  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-  return Math.round(R * c * 100) / 100; // km, 2 decimals
-}
-
-function toRadians(degrees) {
-  return degrees * (Math.PI / 180);
-}
-
 /**
  * Format opening hours from periods array to 24-hour format strings
  * @param {Object} openingHours - regularOpeningHours or currentOpeningHours object
@@ -396,9 +380,10 @@ function formatPeriodsTo24Hour(openingHours) {
 
   // Group periods by day
   for (const period of openingHours.periods) {
-    const openDay = period.open?.day;
-    const openHour = period.open?.hour ?? 0;
-    const openMinute = period.open?.minute ?? 0;
+    if (!period.open) continue;
+    const openDay = period.open.day;
+    const openHour = period.open.hour ?? 0;
+    const openMinute = period.open.minute ?? 0;
     const closeHour = period.close?.hour ?? 0;
     const closeMinute = period.close?.minute ?? 0;
 
