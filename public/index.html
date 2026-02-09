@@ -551,6 +551,109 @@
             margin-top: 20px;
         }
 
+        .favorites-bar {
+            background: white;
+            border-radius: 12px;
+            padding: 15px 20px;
+            margin-bottom: 20px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 15px;
+        }
+
+        .favorites-bar button {
+            background: linear-gradient(135deg, #ff6b6b 0%, #ee5a24 100%);
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 8px;
+            font-size: 1em;
+            font-weight: 600;
+            cursor: pointer;
+            transition: transform 0.2s;
+            white-space: nowrap;
+        }
+
+        .favorites-bar button:hover {
+            transform: translateY(-2px);
+        }
+
+        .favorites-count {
+            background: #ff6b6b;
+            color: white;
+            border-radius: 50%;
+            width: 24px;
+            height: 24px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.8em;
+            font-weight: 700;
+            margin-right: 5px;
+        }
+
+        .favorite-btn {
+            background: none;
+            border: none;
+            font-size: 1.5em;
+            cursor: pointer;
+            transition: transform 0.2s;
+            padding: 5px;
+            line-height: 1;
+        }
+
+        .favorite-btn:hover {
+            transform: scale(1.3);
+        }
+
+        .share-btn {
+            background: none;
+            border: none;
+            font-size: 1.3em;
+            cursor: pointer;
+            transition: transform 0.2s;
+            padding: 5px;
+            line-height: 1;
+            opacity: 0.7;
+        }
+
+        .share-btn:hover {
+            transform: scale(1.2);
+            opacity: 1;
+        }
+
+        .share-toast {
+            position: fixed;
+            bottom: 30px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: #333;
+            color: white;
+            padding: 12px 24px;
+            border-radius: 8px;
+            font-size: 0.95em;
+            z-index: 10000;
+            animation: slideUp 0.3s ease-out;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+        }
+
+        @keyframes slideUp {
+            from { transform: translateX(-50%) translateY(20px); opacity: 0; }
+            to { transform: translateX(-50%) translateY(0); opacity: 1; }
+        }
+
+        .favorite-btn.active {
+            animation: heartBeat 0.3s ease-in-out;
+        }
+
+        @keyframes heartBeat {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.4); }
+            100% { transform: scale(1); }
+        }
+
         .place-card {
             background: white;
             border-radius: 16px;
@@ -902,28 +1005,54 @@
         }
 
         @media (max-width: 768px) {
+            body {
+                padding: 10px;
+            }
+
             .header h1 {
-                font-size: 1.8em;
+                font-size: 1.6em;
             }
 
             .header p {
-                font-size: 1em;
+                font-size: 0.95em;
             }
 
             .search-card {
-                padding: 20px;
+                padding: 15px;
+                border-radius: 12px;
             }
 
             .place-card {
-                padding: 20px;
+                padding: 18px;
+                border-radius: 12px;
             }
 
             .places-grid {
                 grid-template-columns: 1fr;
+                gap: 15px;
             }
 
             .place-name {
-                font-size: 1.2em;
+                font-size: 1.15em;
+            }
+
+            .form-row {
+                grid-template-columns: 1fr;
+            }
+
+            .search-button {
+                padding: 14px 20px;
+                font-size: 1em;
+            }
+
+            .results-header {
+                padding: 15px;
+                border-radius: 12px;
+            }
+
+            .map-modal-content {
+                width: 95%;
+                height: 85vh;
             }
         }
     </style>
@@ -935,7 +1064,7 @@
             <p>מצא מסעדות ובתי קפה סגורים בשבת</p>
             <div style="margin-top: 10px;">
                 <span style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 6px 16px; border-radius: 20px; font-size: 0.85em; font-weight: 600; display: inline-block;">
-                    🎯 KREST v2.4.0 - Graceful Errors
+                    🎯 KREST v2.5.0 - Security & UX Fixes
                 </span>
             </div>
         </div>
@@ -946,7 +1075,7 @@
                     <div class="form-group">
                         <label for="city">🌍 שם עיר (או בחר מיקום)</label>
                         <div style="display: flex; gap: 10px;">
-                            <input type="text" id="city" value="Rehovot" placeholder="לדוגמה: תל אביב" style="flex: 1;">
+                            <input type="text" id="city" placeholder="לדוגמה: רחובות, תל אביב, ירושלים" style="flex: 1;">
                             <button type="button" id="useLocationBtn" class="location-button" title="השתמש במיקום הנוכחי שלי">📍</button>
                             <button type="button" id="openMapBtn" class="map-button" title="בחר מיקום מהמפה">🗺️</button>
                         </div>
@@ -1080,14 +1209,21 @@
             </form>
         </div>
 
+        <div class="favorites-bar" id="favoritesBar" style="display: none;">
+            <div>
+                <span class="favorites-count" id="favCount">0</span>
+                <strong>מועדפים שלי</strong>
+            </div>
+            <button onclick="toggleFavoritesView()">❤️ הצג מועדפים</button>
+        </div>
+
         <div class="error" id="error"></div>
 
         <div class="loading" id="loading">
             <div class="spinner"></div>
             <p>מחפש מקומות סגורים בשבת...</p>
-            <p style="font-size: 0.9em; opacity: 0.8; margin-top: 10px;">⏳ אוסף תוצאות מכל הדפים...</p>
-            <p style="font-size: 0.85em; opacity: 0.7; margin-top: 5px;">Google API מחזיר תוצאות בעמודים עם המתנה של 3 שניות בין כל עמוד</p>
-            <p style="font-size: 0.85em; opacity: 0.7; margin-top: 5px;">התהליך עשוי לקחת 20-60 שניות</p>
+            <p id="loadingTimer" style="font-size: 1.1em; opacity: 0.9; margin-top: 10px; font-weight: 600;">⏱️ 0 שניות</p>
+            <p style="font-size: 0.85em; opacity: 0.7; margin-top: 5px;">סורק את האזור בחיפוש אדפטיבי מקיף</p>
         </div>
 
         <div class="results" id="results"></div>
@@ -1114,6 +1250,14 @@
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 
     <script>
+        // HTML escape to prevent XSS from place names/addresses
+        function escapeHtml(str) {
+            if (!str) return '';
+            const div = document.createElement('div');
+            div.textContent = str;
+            return div.innerHTML;
+        }
+
         const form = document.getElementById('searchForm');
         const loading = document.getElementById('loading');
         const results = document.getElementById('results');
@@ -1384,6 +1528,14 @@
             results.classList.remove('active');
             errorDiv.classList.remove('active');
 
+            // Start loading timer
+            let loadingSeconds = 0;
+            const timerEl = document.getElementById('loadingTimer');
+            const loadingTimer = setInterval(() => {
+                loadingSeconds++;
+                timerEl.textContent = `⏱️ ${loadingSeconds} שניות`;
+            }, 1000);
+
             try {
                 // Build query string - use coordinates if available, otherwise use city
                 // Note: closedSaturday is filtered on client side, not sent to server
@@ -1426,7 +1578,8 @@
                     throw fetchError;
                 }
 
-                // Hide loading
+                // Hide loading and stop timer
+                clearInterval(loadingTimer);
                 loading.classList.remove('active');
 
                 if (!response.ok) {
@@ -1440,10 +1593,14 @@
                 // Apply client-side filters
                 applyClientFilters();
 
+                // Update page title with count
+                document.title = `(${allPlaces.length}) מערכת חיפוש מסעדות`;
+
                 // Display results
                 displayResults(false);
 
             } catch (error) {
+                clearInterval(loadingTimer);
                 loading.classList.remove('active');
 
                 // Provide helpful error messages
@@ -1475,9 +1632,40 @@
 
                 const lowerHours = todayHours.toLowerCase();
                 if (lowerHours.includes('closed') || lowerHours.includes('סגור')) return false;
+                if (lowerHours.includes('24 hours') || lowerHours.includes('24 שעות')) return true;
 
-                // Try to parse hours (simplified - just check if not closed)
-                return true;
+                // Parse time ranges and check if current time falls within
+                const timePattern24h = /(\d{1,2}):(\d{2})[\s–\-]+(\d{1,2}):(\d{2})(?!\s*(am|pm))/gi;
+                const timePattern12h = /(\d{1,2}):(\d{2})\s*(am|pm)[\s–\-]+(\d{1,2}):(\d{2})\s*(am|pm)/gi;
+
+                const matches24h = [...todayHours.matchAll(timePattern24h)];
+                const matches12h = [...todayHours.matchAll(timePattern12h)];
+
+                const ranges = [];
+
+                for (const m of matches24h) {
+                    ranges.push({ open: parseInt(m[1]) * 60 + parseInt(m[2]), close: parseInt(m[3]) * 60 + parseInt(m[4]) });
+                }
+                for (const m of matches12h) {
+                    let oh = parseInt(m[1]), ch = parseInt(m[4]);
+                    if (m[3].toLowerCase() === 'pm' && oh !== 12) oh += 12;
+                    if (m[3].toLowerCase() === 'am' && oh === 12) oh = 0;
+                    if (m[6].toLowerCase() === 'pm' && ch !== 12) ch += 12;
+                    if (m[6].toLowerCase() === 'am' && ch === 12) ch = 0;
+                    ranges.push({ open: oh * 60 + parseInt(m[2]), close: ch * 60 + parseInt(m[5]) });
+                }
+
+                if (ranges.length === 0) return true; // Can't parse, assume open
+
+                for (const r of ranges) {
+                    if (r.close < r.open) {
+                        // Overnight
+                        if (currentTime >= r.open || currentTime < r.close) return true;
+                    } else {
+                        if (currentTime >= r.open && currentTime < r.close) return true;
+                    }
+                }
+                return false;
             });
         }
 
@@ -1786,14 +1974,18 @@
                         hoursHtml = '<div class="hours-day"><span class="hours-day-time">אין מידע על שעות פתיחה</span></div>';
                     }
 
+                    const isFav = isFavorite(place.placeId || place.name);
                     cardsHtml += `
                         <div class="place-card">
                             <div class="place-header">
                                 <div>
-                                    <div class="place-name">${place.name}</div>
-                                    <div class="place-address">${place.address}</div>
+                                    <div class="place-name">${escapeHtml(place.name)}</div>
+                                    <div class="place-address">${escapeHtml(place.address)}</div>
                                 </div>
-                                <div class="place-number">${index + 1}</div>
+                                <div style="display:flex; align-items:center; gap:8px;">
+                                    <button class="favorite-btn ${isFav ? 'active' : ''}" onclick="toggleFavorite(this, ${index})" title="הוסף למועדפים">${isFav ? '❤️' : '🤍'}</button>
+                                    <div class="place-number">${index + 1}</div>
+                                </div>
                             </div>
 
                             <div class="place-rating">
@@ -1825,8 +2017,11 @@
                                 </div>
                             </div>
 
-                            <a href="${place.googleMapsUrl}" target="_blank" class="map-link">🗺️ פתח במפות גוגל</a>
-                            <div class="kosher-info" id="kosher-info-${index}" data-place-name="${place.name.replace(/"/g, '&quot;')}" data-place-address="${place.address.replace(/"/g, '&quot;')}">
+                            <div style="display:flex; gap:10px; align-items:center; margin-top:15px; flex-wrap:wrap;">
+                                <a href="${escapeHtml(place.googleMapsUrl)}" target="_blank" rel="noopener noreferrer" class="map-link" style="margin-top:0;">🗺️ פתח במפות גוגל</a>
+                                <button class="share-btn" onclick="sharePlace(${index})" title="שתף">📤</button>
+                            </div>
+                            <div class="kosher-info" id="kosher-info-${index}" data-place-name="${escapeHtml(place.name)}" data-place-address="${escapeHtml(place.address)}">
                                 <div class="kosher-loading">🔄 טוען מידע כשרות...</div>
                             </div>
                         </div>
@@ -1971,7 +2166,7 @@
                 badges.push('<span class="kosher-badge badge-kosher">🏅 בד"ץ</span>');
             }
 
-            const formattedResponse = response
+            const formattedResponse = escapeHtml(response)
                 .replace(/\n/g, '<br>')
                 .replace(/\*\*/g, '')
                 .replace(/\*/g, '•');
@@ -2017,14 +2212,13 @@
             localStorage.setItem('placeSearchSettings', JSON.stringify(settings));
 
             // Show success message
-            const cityContainer = document.querySelector('.city-input-container');
             const successMsg = document.createElement('div');
             successMsg.textContent = '✓ הגדרות נשמרו בהצלחה!';
             successMsg.style.color = '#4caf50';
             successMsg.style.fontSize = '0.9em';
             successMsg.style.marginTop = '5px';
             successMsg.style.fontWeight = '500';
-            cityContainer.appendChild(successMsg);
+            form.appendChild(successMsg);
 
             setTimeout(() => {
                 successMsg.remove();
@@ -2099,17 +2293,16 @@
             locationStatus.textContent = '';
 
             // Show success message
-            const cityContainer = document.querySelector('.city-input-container');
-            const successMsg = document.createElement('div');
-            successMsg.textContent = '✓ הגדרות אופסו לברירת מחדל!';
-            successMsg.style.color = '#ff9800';
-            successMsg.style.fontSize = '0.9em';
-            successMsg.style.marginTop = '5px';
-            successMsg.style.fontWeight = '500';
-            cityContainer.appendChild(successMsg);
+            const resetMsg = document.createElement('div');
+            resetMsg.textContent = '✓ הגדרות אופסו לברירת מחדל!';
+            resetMsg.style.color = '#ff9800';
+            resetMsg.style.fontSize = '0.9em';
+            resetMsg.style.marginTop = '5px';
+            resetMsg.style.fontWeight = '500';
+            form.appendChild(resetMsg);
 
             setTimeout(() => {
-                successMsg.remove();
+                resetMsg.remove();
             }, 3000);
         }
 
@@ -2301,158 +2494,248 @@
             errorDiv.style.display = 'block';
         }
 
-                    // Find the kosher info div (next sibling of button)
-            const kosherInfoDiv = button.nextElementSibling;
+        // ===== SHARE FEATURE =====
+        async function sharePlace(index) {
+            const place = allPlaces[index];
+            if (!place) return;
 
-            // If already showing, toggle off
-            if (kosherInfoDiv.classList.contains('active')) {
-                kosherInfoDiv.classList.remove('active');
+            const stars = '⭐'.repeat(Math.round(place.rating));
+            const text = `${place.name}\n${stars} ${place.rating} (${place.reviewCount} ביקורות)\n📍 ${place.address}${place.phone ? '\n📞 ' + place.phone : ''}\n🗺️ ${place.googleMapsUrl || ''}`;
+
+            // Try native Web Share API first (mobile)
+            if (navigator.share) {
+                try {
+                    await navigator.share({
+                        title: place.name,
+                        text: text,
+                        url: place.googleMapsUrl || ''
+                    });
+                    return;
+                } catch (err) {
+                    if (err.name === 'AbortError') return; // User cancelled
+                }
+            }
+
+            // Fallback: copy to clipboard
+            try {
+                await navigator.clipboard.writeText(text);
+                showToast('הועתק ללוח!');
+            } catch {
+                // Last resort fallback
+                const textarea = document.createElement('textarea');
+                textarea.value = text;
+                textarea.style.position = 'fixed';
+                textarea.style.opacity = '0';
+                document.body.appendChild(textarea);
+                textarea.select();
+                document.execCommand('copy');
+                document.body.removeChild(textarea);
+                showToast('הועתק ללוח!');
+            }
+        }
+
+        function showToast(message) {
+            const existing = document.querySelector('.share-toast');
+            if (existing) existing.remove();
+
+            const toast = document.createElement('div');
+            toast.className = 'share-toast';
+            toast.textContent = message;
+            document.body.appendChild(toast);
+            setTimeout(() => toast.remove(), 2500);
+        }
+
+        // ===== FAVORITES FEATURE =====
+        let showingFavorites = false;
+
+        function getFavorites() {
+            try {
+                return JSON.parse(localStorage.getItem('krestFavorites') || '{}');
+            } catch { return {}; }
+        }
+
+        function saveFavorites(favs) {
+            localStorage.setItem('krestFavorites', JSON.stringify(favs));
+            updateFavoritesBar();
+        }
+
+        function isFavorite(placeKey) {
+            return !!getFavorites()[placeKey];
+        }
+
+        function toggleFavorite(btn, index) {
+            const place = allPlaces[index];
+            if (!place) return;
+            const key = place.placeId || place.name;
+            const favs = getFavorites();
+
+            if (favs[key]) {
+                delete favs[key];
+                btn.textContent = '🤍';
+                btn.classList.remove('active');
+            } else {
+                favs[key] = {
+                    name: place.name,
+                    address: place.address,
+                    rating: place.rating,
+                    reviewCount: place.reviewCount,
+                    phone: place.phone,
+                    googleMapsUrl: place.googleMapsUrl,
+                    placeId: place.placeId,
+                    openingHours: place.openingHours,
+                    distance: place.distance,
+                    savedAt: new Date().toISOString()
+                };
+                btn.textContent = '❤️';
+                btn.classList.add('active');
+            }
+            saveFavorites(favs);
+        }
+
+        function updateFavoritesBar() {
+            const favs = getFavorites();
+            const count = Object.keys(favs).length;
+            const bar = document.getElementById('favoritesBar');
+            const countEl = document.getElementById('favCount');
+
+            if (count > 0) {
+                bar.style.display = 'flex';
+                countEl.textContent = count;
+            } else {
+                bar.style.display = 'none';
+                if (showingFavorites) {
+                    showingFavorites = false;
+                    results.classList.remove('active');
+                }
+            }
+        }
+
+        function toggleFavoritesView() {
+            showingFavorites = !showingFavorites;
+
+            if (showingFavorites) {
+                displayFavorites();
+            } else {
+                // Restore search results
+                if (allPlaces.length > 0) {
+                    displayResults(false);
+                } else {
+                    results.classList.remove('active');
+                }
+            }
+        }
+
+        function displayFavorites() {
+            const favs = getFavorites();
+            const favList = Object.values(favs);
+
+            if (favList.length === 0) {
+                results.innerHTML = `
+                    <div class="no-results">
+                        <div class="no-results-icon">❤️</div>
+                        <h3>אין מועדפים עדיין</h3>
+                        <p>לחץ על 🤍 ליד מקום כדי להוסיף אותו למועדפים</p>
+                    </div>
+                `;
+                results.classList.add('active');
                 return;
             }
 
-            // Disable button and show loading
-            button.disabled = true;
-            button.classList.add('loading');
-            button.textContent = '🔄 בודק...';
-
-            try {
-                const prompt = `Search the web for information about this restaurant in Israel and provide kosher status:
-
-Restaurant: "${placeName}"
-Address: "${placeAddress}"
-
-Please search for:
-1. The restaurant's official website
-2. "${placeName} כשרות" (kosher certification)
-3. "${placeName} ${placeAddress}" reviews
-
-Based on your web search, provide in Hebrew:
-
-🔍 מקור המידע: [מאיפה מצאת את המידע - אתר רשמי/ביקורות/וכו']
-✡️ סטטוס כשרות: [כשר/לא כשר/לא נמצא מידע]
-📜 השגחה: [רבנות/בד"ץ/מהדרין/לא ידוע]
-🍽️ סוג: [בשרי/חלבי/פרווה/לא ידוע]
-🌐 אתר: [כתובת האתר אם נמצא]
-📞 טלפון: [אם נמצא]
-💡 מידע נוסף: [כל מידע רלוונטי שמצאת]
-
-If you cannot find specific kosher information, say so clearly. Be factual based on what you actually find online.
-Answer in Hebrew only.`;
-
-                const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'Authorization': `Bearer ${apiKey}`,
-                        'HTTP-Referer': window.location.origin,
-                        'X-Title': 'KREST Restaurant Finder'
-                    },
-                    body: JSON.stringify({
-                        model: 'perplexity/sonar-pro',
-                        messages: [
-                            {
-                                role: 'user',
-                                content: prompt
-                            }
-                        ],
-                        max_tokens: 1000,
-                        temperature: 0.3
-                    })
-                });
-
-                if (!response.ok) {
-                    throw new Error(`API error: ${response.status}`);
-                }
-
-                const data = await response.json();
-                const aiResponse = data.choices[0]?.message?.content || 'לא התקבל מידע';
-
-                // Parse and display the response
-                displayKosherInfo(kosherInfoDiv, aiResponse, placeName);
-
-            } catch (error) {
-                console.error('OpenRouter API error:', error);
-                kosherInfoDiv.innerHTML = `
-                    <div class="kosher-info-title">❌ שגיאה</div>
-                    <div class="kosher-info-content">לא ניתן לקבל מידע כשרות. נסה שוב מאוחר יותר.</div>
-                `;
-                kosherInfoDiv.classList.add('active', 'error');
-            } finally {
-                // Re-enable button
-                button.disabled = false;
-                button.classList.remove('loading');
-                button.textContent = '🕎 בדוק כשרות';
-            }
-        }
-
-        function displayKosherInfo(container, response, placeName) {
-            // Try to extract badges from response
-            const badges = [];
-
-            // Check for kosher likelihood
-            if (response.includes('סביר שכשר') || response.includes('כשר למהדרין') || response.includes('בהשגחת')) {
-                badges.push('<span class="kosher-badge badge-kosher">✓ סביר שכשר</span>');
-            } else if (response.includes('סביר שלא כשר') || response.includes('לא כשר')) {
-                badges.push('<span class="kosher-badge badge-not-kosher">✗ כנראה לא כשר</span>');
-            } else if (response.includes('לא ברור') || response.includes('לא ניתן לקבוע')) {
-                badges.push('<span class="kosher-badge badge-unknown">❓ לא ברור</span>');
-            }
-
-            // Check for dairy/meat
-            if (response.includes('חלבי') && !response.includes('לא חלבי')) {
-                badges.push('<span class="kosher-badge badge-dairy">🥛 חלבי</span>');
-            }
-            if (response.includes('בשרי') && !response.includes('לא בשרי')) {
-                badges.push('<span class="kosher-badge badge-meat">🥩 בשרי</span>');
-            }
-            if (response.includes('פרווה')) {
-                badges.push('<span class="kosher-badge badge-parve">🥗 פרווה</span>');
-            }
-            if (response.includes('טבעוני')) {
-                badges.push('<span class="kosher-badge badge-parve">🌱 טבעוני</span>');
-            }
-
-            // Check for certification
-            if (response.includes('מהדרין')) {
-                badges.push('<span class="kosher-badge badge-kosher">⭐ מהדרין</span>');
-            }
-            if (response.includes('בד"ץ') || response.includes('בדץ')) {
-                badges.push('<span class="kosher-badge badge-kosher">🏅 בד"ץ</span>');
-            }
-            if (response.includes('רבנות')) {
-                badges.push('<span class="kosher-badge badge-kosher">📜 רבנות</span>');
-            }
-
-            // Check confidence level
-            if (response.includes('ודאות: גבוהה') || response.includes('רמת ודאות: גבוהה')) {
-                badges.push('<span class="kosher-badge" style="background:#a5d6a7;color:#1b5e20;">📊 ודאות גבוהה</span>');
-            } else if (response.includes('ודאות: נמוכה') || response.includes('רמת ודאות: נמוכה')) {
-                badges.push('<span class="kosher-badge" style="background:#ffcc80;color:#e65100;">📊 ודאות נמוכה</span>');
-            }
-
-            // Format the response with line breaks
-            const formattedResponse = response
-                .replace(/\n/g, '<br>')
-                .replace(/\*\*/g, '')
-                .replace(/\*/g, '•');
-
-            container.innerHTML = `
-                <div class="kosher-info-title">
-                    🕎 מידע כשרות - ${placeName}
+            let html = `
+                <div class="results-header">
+                    <h2>❤️ המועדפים שלי (${favList.length})</h2>
+                    <div style="margin-top:10px; font-size:0.9em; color:#666; display:flex; gap:10px; flex-wrap:wrap;">
+                        <button onclick="shareAllFavorites()" style="background:#667eea; color:white; border:none; padding:8px 16px; border-radius:6px; cursor:pointer; font-size:0.9em;">📤 שתף הכל</button>
+                        <button onclick="clearAllFavorites()" style="background:#f44336; color:white; border:none; padding:8px 16px; border-radius:6px; cursor:pointer; font-size:0.9em;">🗑️ נקה הכל</button>
+                    </div>
                 </div>
-                <div style="margin-bottom: 10px;">
-                    ${badges.join(' ')}
-                </div>
-                <div class="kosher-info-content">
-                    ${formattedResponse}
-                </div>
-                <div style="margin-top: 10px; font-size: 0.8em; color: #888;">
-                    ⚠️ מידע זה נוצר על ידי AI ויש לאמת אותו מול המסעדה
-                </div>
+                <div class="places-grid">
             `;
-            container.classList.remove('error');
-            container.classList.add('active');
+
+            favList.sort((a, b) => (b.rating || 0) - (a.rating || 0));
+
+            favList.forEach((place, idx) => {
+                const fullStars = Math.floor(place.rating || 0);
+                const hasHalf = (place.rating || 0) % 1 >= 0.5;
+                let stars = '★'.repeat(fullStars);
+                if (hasHalf) stars += '½';
+
+                const distance = place.distance != null
+                    ? (place.distance < 1 ? `${Math.round(place.distance * 1000)}מ'` : `${place.distance.toFixed(2)}ק"מ`)
+                    : '';
+
+                html += `
+                    <div class="place-card">
+                        <div class="place-header">
+                            <div>
+                                <div class="place-name">${escapeHtml(place.name)}</div>
+                                <div class="place-address">${escapeHtml(place.address)}</div>
+                            </div>
+                            <button class="favorite-btn active" data-fav-key="${escapeHtml(place.placeId || place.name)}" onclick="removeFavoriteByKey(this.dataset.favKey); displayFavorites();">❤️</button>
+                        </div>
+                        <div class="place-rating">
+                            <div class="stars">${stars}</div>
+                            <div class="rating-text">${(place.rating || 0).toFixed(1)}</div>
+                            <div class="reviews">(${place.reviewCount || 0} ביקורות)</div>
+                        </div>
+                        <div class="place-details">
+                            ${distance ? `<div class="detail-item"><div class="detail-icon">📏</div><div class="detail-text">${distance}</div></div>` : ''}
+                            ${place.phone ? `<div class="detail-item"><div class="detail-icon">📞</div><div class="detail-text" dir="ltr">${escapeHtml(place.phone)}</div></div>` : ''}
+                        </div>
+                        ${place.googleMapsUrl ? `<a href="${escapeHtml(place.googleMapsUrl)}" target="_blank" rel="noopener noreferrer" class="map-link">🗺️ פתח במפות גוגל</a>` : ''}
+                    </div>
+                `;
+            });
+
+            html += '</div>';
+            results.innerHTML = html;
+            results.classList.add('active');
         }
+
+        function removeFavoriteByKey(key) {
+            const favs = getFavorites();
+            delete favs[key];
+            saveFavorites(favs);
+        }
+
+        async function shareAllFavorites() {
+            const favs = Object.values(getFavorites());
+            if (favs.length === 0) return;
+
+            let text = `❤️ המועדפים שלי (${favs.length} מקומות)\n\n`;
+            favs.forEach((p, i) => {
+                text += `${i + 1}. ${p.name} - ${'⭐'.repeat(Math.round(p.rating || 0))} ${(p.rating || 0).toFixed(1)}\n   📍 ${p.address}\n`;
+                if (p.googleMapsUrl) text += `   🗺️ ${p.googleMapsUrl}\n`;
+                text += '\n';
+            });
+
+            if (navigator.share) {
+                try {
+                    await navigator.share({ title: 'המועדפים שלי - KREST', text: text });
+                    return;
+                } catch (err) {
+                    if (err.name === 'AbortError') return;
+                }
+            }
+            try {
+                await navigator.clipboard.writeText(text);
+                showToast('רשימת המועדפים הועתקה!');
+            } catch {
+                showToast('לא ניתן להעתיק');
+            }
+        }
+
+        function clearAllFavorites() {
+            if (confirm('האם אתה בטוח שברצונך למחוק את כל המועדפים?')) {
+                saveFavorites({});
+                if (showingFavorites) displayFavorites();
+            }
+        }
+
+        // Initialize favorites bar on load
+        window.addEventListener('DOMContentLoaded', () => {
+            updateFavoritesBar();
+        });
 
         // Register Service Worker for PWA functionality
         if ('serviceWorker' in navigator) {

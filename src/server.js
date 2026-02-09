@@ -17,6 +17,17 @@ const app = express();
 // Middleware
 app.use(express.json());
 
+// CORS support
+app.use((req, res, next) => {
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+  if (req.method === 'OPTIONS') {
+    return res.sendStatus(204);
+  }
+  next();
+});
+
 // Serve static files from public directory
 app.use(express.static(join(__dirname, '..', 'public')));
 
@@ -25,8 +36,20 @@ app.get('/health', (req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
 });
 
+// Middleware to check API key is configured for search endpoints
+function requireApiKey(req, res, next) {
+  if (!config.googlePlacesApiKey) {
+    return res.status(503).json({
+      success: false,
+      error: 'API_KEY_NOT_SET',
+      message: 'Google Places API key is not configured. Set GOOGLE_PLACES_API_KEY environment variable.',
+    });
+  }
+  next();
+}
+
 // Kosher info endpoint - uses OpenRouter API
-app.post('/api/kosher-check', async (req, res) => {
+app.post('/api/kosher-check', rateLimitMiddleware, async (req, res) => {
   try {
     const { placeName, placeAddress } = req.body;
 
@@ -34,6 +57,14 @@ app.post('/api/kosher-check', async (req, res) => {
       return res.status(400).json({
         success: false,
         error: 'Missing placeName or placeAddress',
+      });
+    }
+
+    // Limit input length to prevent abuse
+    if (placeName.length > 200 || placeAddress.length > 500) {
+      return res.status(400).json({
+        success: false,
+        error: 'placeName or placeAddress too long',
       });
     }
 
@@ -106,7 +137,7 @@ Answer in Hebrew only.`;
 });
 
 // NEW: Adaptive Tiling Search endpoint (uses Google Places API New)
-app.get('/api/places/adaptive', rateLimitMiddleware, async (req, res) => {
+app.get('/api/places/adaptive', rateLimitMiddleware, requireApiKey, async (req, res) => {
   try {
     // Validate parameters
     const validation = validateQueryParameters(req.query);
@@ -284,7 +315,7 @@ app.get('/api/places/adaptive', rateLimitMiddleware, async (req, res) => {
 
 // Main search endpoint with comprehensive validation (primary endpoint)
 // Apply rate limiting middleware
-app.get('/api/places/search', rateLimitMiddleware, async (req, res) => {
+app.get('/api/places/search', rateLimitMiddleware, requireApiKey, async (req, res) => {
   try {
     // Validate all query parameters
     const validation = validateQueryParameters(req.query);
@@ -401,7 +432,7 @@ app.get('/api/places/search', rateLimitMiddleware, async (req, res) => {
 
 // Legacy endpoint (backward compatibility)
 // Apply rate limiting middleware
-app.get('/api/places', rateLimitMiddleware, async (req, res) => {
+app.get('/api/places', rateLimitMiddleware, requireApiKey, async (req, res) => {
   try {
     // Extract query parameters
     const { city, latitude, longitude, radius, minRating, minReviews } = req.query;

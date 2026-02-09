@@ -369,7 +369,6 @@ export async function searchPlaces({ latitude, longitude, radius, minRating, min
         // File: Log only place names and ranks
         const places = response.data.results || [];
         try {
-          const logPath = join(process.cwd(), 'google-api-debug.log');
           places.forEach((place, index) => {
             const rank = allPlaces.length + index + 1;
             const rating = place.rating || 'N/A';

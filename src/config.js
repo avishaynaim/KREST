@@ -24,9 +24,6 @@ export const config = {
   defaultMinReviews: 100, // minimum 100 reviews required
 };
 
-// Flag to track if config has been initialized with API key from bridge
-let configInitialized = false;
-
 /**
  * Initialize configuration with API key from bridge
  * Called by nodejs-mobile bridge when WebView sends API key
@@ -37,7 +34,6 @@ export function initializeConfigWithApiKey(apiKey) {
     throw new Error('API key is required');
   }
   config.googlePlacesApiKey = apiKey;
-  configInitialized = true;
   console.log('[Config] API key received from WebView - configuration initialized');
 }
 

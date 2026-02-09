@@ -31,7 +31,7 @@ function getClientIp(req) {
   }
 
   // Fall back to direct connection IP
-  return req.socket.remoteAddress || req.connection.remoteAddress || 'unknown';
+  return req.socket.remoteAddress || 'unknown';
 }
 
 /**
