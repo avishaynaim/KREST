@@ -49,11 +49,17 @@ function requireApiKey(req, res, next) {
 
 // Kosher-check specific rate limit (20 per hour per IP, protects OpenRouter quota)
 const kosherCheckLimits = new Map();
+const KOSHER_MAX_IPS = 5000; // Memory cap for kosher rate limit store
 function kosherRateLimit(req, res, next) {
   const ip = req.headers['x-forwarded-for']?.split(',')[0]?.trim() || req.socket.remoteAddress || 'unknown';
   const now = Date.now();
   const data = kosherCheckLimits.get(ip);
   if (!data || now - data.start > 3600000) {
+    // Evict oldest if at capacity
+    if (!data && kosherCheckLimits.size >= KOSHER_MAX_IPS) {
+      const firstKey = kosherCheckLimits.keys().next().value;
+      kosherCheckLimits.delete(firstKey);
+    }
     kosherCheckLimits.set(ip, { count: 1, start: now });
   } else {
     data.count++;
@@ -426,7 +432,7 @@ app.get('/api/places/search', rateLimitMiddleware, requireApiKey, async (req, re
     // Determine error type and status code
     let statusCode = 500;
     let errorCode = 'INTERNAL_ERROR';
-    let message = error.message;
+    let message = 'An unexpected error occurred. Please try again.';
 
     // Validation errors
     if (error.message.includes('must be provided') ||
@@ -435,11 +441,13 @@ app.get('/api/places/search', rateLimitMiddleware, requireApiKey, async (req, re
         error.message.includes('between')) {
       statusCode = 400;
       errorCode = 'INVALID_PARAMETERS';
+      message = 'Invalid search parameters. Please check your input.';
     }
     // Location errors (geocoding)
     else if (error.message.includes('City not found')) {
       statusCode = 400;
       errorCode = 'INVALID_LOCATION';
+      message = 'City not found. Please check the city name and try again.';
     }
     // Rate limit errors
     else if (error.message.includes('RATE_LIMIT_EXCEEDED')) {
@@ -453,6 +461,7 @@ app.get('/api/places/search', rateLimitMiddleware, requireApiKey, async (req, re
              error.message.includes('API key')) {
       statusCode = 500;
       errorCode = 'GOOGLE_API_ERROR';
+      message = 'Search service temporarily unavailable. Please try again.';
     }
 
     res.status(statusCode).json({
@@ -540,7 +549,7 @@ app.get('/api/places', rateLimitMiddleware, requireApiKey, async (req, res) => {
 
     res.status(statusCode).json({
       success: false,
-      error: statusCode === 400 ? error.message : 'Search failed. Please try again.',
+      error: statusCode === 400 ? 'Invalid search parameters. Please check your input.' : 'Search failed. Please try again.',
     });
   }
 });

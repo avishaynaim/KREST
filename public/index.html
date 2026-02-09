@@ -415,6 +415,36 @@
 
         .places-table-container {
             display: none;
+            overflow-x: auto;
+            background: var(--card-bg);
+            border-radius: 16px;
+            box-shadow: var(--card-shadow);
+            margin-top: 20px;
+        }
+
+        .view-toggle {
+            display: flex;
+            gap: 6px;
+            background: var(--hours-bg);
+            border-radius: 8px;
+            padding: 4px;
+        }
+
+        .view-toggle-btn {
+            background: none;
+            border: none;
+            padding: 8px 14px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 1em;
+            transition: all 0.2s;
+            color: var(--text-secondary);
+            font-family: inherit;
+        }
+
+        .view-toggle-btn.active {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
         }
 
         .places-table {
@@ -1297,7 +1327,7 @@
             <p>מצא מסעדות ובתי קפה סגורים בשבת</p>
             <div style="margin-top: 10px;">
                 <span style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 6px 16px; border-radius: 20px; font-size: 0.85em; font-weight: 600; display: inline-block;">
-                    🎯 KREST v2.7.0 - Dark Mode & Polish
+                    🎯 KREST v2.8.0 - Table View & Hardening
                 </span>
             </div>
         </div>
@@ -1518,6 +1548,7 @@
         let currentLocation = null; // Store current GPS location
         let kosherLoadTimer = null; // Track kosher info loading timeout
         let kosherLoadGeneration = 0; // Generation counter to cancel stale loads
+        let currentView = localStorage.getItem('krest-view') || 'cards'; // 'cards' or 'table'
 
         // Map variables
         let map = null;
@@ -2213,20 +2244,34 @@
                             ${arrow ? `<span class="sort-arrow">${arrow}</span>` : ''}${opt.icon} ${opt.label}
                         </button>`;
                     }
-                    html += `</div>`;
+                    html += `<div style="flex:1;"></div>
+                        <div class="view-toggle">
+                            <button class="view-toggle-btn ${currentView === 'cards' ? 'active' : ''}" onclick="switchView('cards')" title="תצוגת כרטיסים">🃏</button>
+                            <button class="view-toggle-btn ${currentView === 'table' ? 'active' : ''}" onclick="switchView('table')" title="תצוגת טבלה">📋</button>
+                        </div>
+                    </div>`;
                 }
 
                 // Get the places to display
                 const endIndex = currentOffset + resultsPerPage;
                 const placesToShow = allPlaces.slice(currentOffset, endIndex);
 
-                if (!append) {
+                // Table view
+                if (currentView === 'table' && !append) {
+                    html += buildTableView(allPlaces);
+                    // Close early - table shows all at once, no pagination
+                }
+
+                if (currentView === 'cards' && !append) {
                     // Create grid container
                     html += `<div class="places-grid" id="places-grid">`;
                 }
 
-                // Build cards
+                // Build cards (only in card view)
                 let cardsHtml = '';
+                if (currentView === 'table' && !append) {
+                    // Table already built above, skip card building
+                } else {
                 placesToShow.forEach((place, idx) => {
                     const index = currentOffset + idx;
                     const fullStars = Math.floor(place.rating);
@@ -2318,27 +2363,30 @@
 
                 if (append) {
                     document.getElementById('places-grid').insertAdjacentHTML('beforeend', cardsHtml);
-                } else {
+                } else if (currentView === 'cards') {
                     html += cardsHtml + '</div>';
                 }
+                } // end of card-view else block
 
-                // Add "Show More" button if there are more results
-                const hasMore = endIndex < allPlaces.length;
-                if (hasMore) {
-                    const remaining = allPlaces.length - endIndex;
-                    const showMoreHtml = `
-                        <div class="show-more-container">
-                            <button class="show-more-button" onclick="showMore()">
-                                📄 הצג עוד (${remaining} נוספים)
-                            </button>
-                        </div>
-                    `;
-                    if (!append) {
-                        html += showMoreHtml;
-                    } else {
-                        const existing = document.querySelector('.show-more-container');
-                        if (existing) existing.remove();
-                        document.querySelector('.places-grid').insertAdjacentHTML('afterend', showMoreHtml);
+                // Add "Show More" button (only in card view)
+                if (currentView === 'cards') {
+                    const hasMore = endIndex < allPlaces.length;
+                    if (hasMore) {
+                        const remaining = allPlaces.length - endIndex;
+                        const showMoreHtml = `
+                            <div class="show-more-container">
+                                <button class="show-more-button" onclick="showMore()">
+                                    📄 הצג עוד (${remaining} נוספים)
+                                </button>
+                            </div>
+                        `;
+                        if (!append) {
+                            html += showMoreHtml;
+                        } else {
+                            const existing = document.querySelector('.show-more-container');
+                            if (existing) existing.remove();
+                            document.querySelector('.places-grid').insertAdjacentHTML('afterend', showMoreHtml);
+                        }
                     }
                 }
             }
@@ -2351,13 +2399,15 @@
                 results.scrollIntoView({ behavior: 'smooth', block: 'start' });
             }
 
-            // Auto-load kosher info for visible cards (cancel previous)
-            if (kosherLoadTimer) clearTimeout(kosherLoadTimer);
-            kosherLoadGeneration++;
-            const thisGeneration = kosherLoadGeneration;
-            kosherLoadTimer = setTimeout(() => {
-                autoLoadKosherInfo(thisGeneration);
-            }, 500);
+            // Auto-load kosher info for visible cards (cancel previous, card view only)
+            if (currentView === 'cards') {
+                if (kosherLoadTimer) clearTimeout(kosherLoadTimer);
+                kosherLoadGeneration++;
+                const thisGeneration = kosherLoadGeneration;
+                kosherLoadTimer = setTimeout(() => {
+                    autoLoadKosherInfo(thisGeneration);
+                }, 500);
+            }
         }
 
         function sortResults(column) {
@@ -2383,6 +2433,56 @@
 
             currentOffset = 0;
             displayResults(false);
+        }
+
+        function buildTableView(places) {
+            let html = `<div class="places-table-container" style="display:block;">
+                <table class="places-table">
+                    <thead><tr>
+                        <th class="table-number">#</th>
+                        <th class="table-name">שם</th>
+                        <th class="table-rating">דירוג</th>
+                        <th class="table-reviews">ביקורות</th>
+                        <th class="table-distance">מרחק</th>
+                        <th class="table-saturday">שבת</th>
+                        <th class="table-map">מפה</th>
+                    </tr></thead><tbody>`;
+
+            places.forEach((place, i) => {
+                const fullStars = Math.floor(place.rating);
+                const hasHalf = place.rating % 1 >= 0.5;
+                let stars = '★'.repeat(fullStars);
+                if (hasHalf) stars += '½';
+
+                const distance = place.distance < 1
+                    ? `${Math.round(place.distance * 1000)}מ'`
+                    : `${place.distance.toFixed(2)}ק"מ`;
+
+                const satHours = place.openingHours?.[6] || '';
+                const satClean = satHours.replace(/Saturday:|שבת:/gi, '').trim() || 'לא ידוע';
+
+                html += `<tr>
+                    <td class="table-number">${i + 1}</td>
+                    <td class="table-name"><strong>${escapeHtml(place.name)}</strong><small>${escapeHtml(place.address)}</small></td>
+                    <td class="table-rating"><span class="table-rating-stars">${stars}</span><span class="table-rating-number">${place.rating.toFixed(1)}</span></td>
+                    <td class="table-reviews">${place.reviewCount}</td>
+                    <td class="table-distance">${distance}</td>
+                    <td class="table-saturday">${escapeHtml(satClean)}</td>
+                    <td class="table-map"><a href="${escapeHtml(place.googleMapsUrl)}" target="_blank" rel="noopener noreferrer" class="table-link">🗺️</a></td>
+                </tr>`;
+            });
+
+            html += `</tbody></table></div>`;
+            return html;
+        }
+
+        function switchView(view) {
+            currentView = view;
+            localStorage.setItem('krest-view', view);
+            if (allPlaces.length > 0) {
+                currentOffset = 0;
+                displayResults(false);
+            }
         }
 
         // Auto-load kosher info for all visible cards - PARALLEL loading
@@ -2938,7 +3038,7 @@
                 ].join(',');
             });
 
-            const csvContent = BOM + headers.join(',') + '\n' + rows.join('\n');
+            const csvContent = BOM + headers.map(csvEscape).join(',') + '\n' + rows.join('\n');
             const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
             const url = URL.createObjectURL(blob);
 
@@ -2949,7 +3049,7 @@
             link.download = `krest-${locationName}-${timestamp}.csv`;
             link.click();
 
-            URL.revokeObjectURL(url);
+            setTimeout(() => URL.revokeObjectURL(url), 1000);
             showToast('קובץ CSV הורד בהצלחה!');
         }
 
@@ -3189,19 +3289,23 @@
             if (saved === 'dark') {
                 document.documentElement.setAttribute('data-theme', 'dark');
                 document.getElementById('themeToggle').textContent = '☀️';
+                document.querySelector('meta[name="theme-color"]').content = '#1a1a2e';
             }
         }
 
         function toggleTheme() {
             const html = document.documentElement;
             const btn = document.getElementById('themeToggle');
+            const meta = document.querySelector('meta[name="theme-color"]');
             if (html.getAttribute('data-theme') === 'dark') {
                 html.removeAttribute('data-theme');
                 btn.textContent = '🌙';
+                meta.content = '#667eea';
                 localStorage.setItem('krest-theme', 'light');
             } else {
                 html.setAttribute('data-theme', 'dark');
                 btn.textContent = '☀️';
+                meta.content = '#1a1a2e';
                 localStorage.setItem('krest-theme', 'dark');
             }
         }

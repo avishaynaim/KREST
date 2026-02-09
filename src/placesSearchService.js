@@ -246,19 +246,22 @@ export async function searchPlaces({ latitude, longitude, radius, minRating, min
   console.log(`Open Now: ${opennow !== undefined ? opennow : 'not set'}`);
   console.log('========================\n');
 
-  // Debug log file (concurrent writes are handled gracefully - append is atomic for small writes)
-  const logPath = join(process.cwd(), 'google-api-debug.log');
-  try {
-    const header = `SEARCH STARTED: ${new Date().toISOString()}\n` +
-      `Location: ${latitude}, ${longitude}\n` +
-      `Radius: ${searchRadius}km\n` +
-      `Type: ${type || 'both'}\n` +
-      `Open Now: ${opennow !== undefined ? opennow : 'not set'}\n` +
-      `Filter Closed Saturday: ${filterClosedSaturday}\n` +
-      `${'='.repeat(80)}\n\n`;
-    await writeFile(logPath, header);
-  } catch (err) {
-    console.error('Failed to clear log file:', err.message);
+  // Debug log file (only in development - avoids disk I/O in production)
+  const isProduction = process.env.NODE_ENV === 'production';
+  const logPath = isProduction ? null : join(process.cwd(), 'google-api-debug.log');
+  if (logPath) {
+    try {
+      const header = `SEARCH STARTED: ${new Date().toISOString()}\n` +
+        `Location: ${latitude}, ${longitude}\n` +
+        `Radius: ${searchRadius}km\n` +
+        `Type: ${type || 'both'}\n` +
+        `Open Now: ${opennow !== undefined ? opennow : 'not set'}\n` +
+        `Filter Closed Saturday: ${filterClosedSaturday}\n` +
+        `${'='.repeat(80)}\n\n`;
+      await writeFile(logPath, header);
+    } catch (err) {
+      console.error('Failed to clear log file:', err.message);
+    }
   }
 
   // Validate radius
@@ -321,12 +324,14 @@ export async function searchPlaces({ latitude, longitude, radius, minRating, min
         const paramsForLog = { ...requestParams, key: '***hidden***' };
         console.log(JSON.stringify(paramsForLog, null, 2));
 
-        // Also write request params to log file
-        try {
-          const requestLog = `REQUEST (${placeType} page ${pageCount + 1}):\n${JSON.stringify(paramsForLog, null, 2)}\n\n`;
-          await appendFile(logPath, requestLog);
-        } catch (err) {
-          console.error('Failed to write request to log file:', err.message);
+        // Also write request params to log file (dev only)
+        if (logPath) {
+          try {
+            const requestLog = `REQUEST (${placeType} page ${pageCount + 1}):\n${JSON.stringify(paramsForLog, null, 2)}\n\n`;
+            await appendFile(logPath, requestLog);
+          } catch (err) {
+            console.error('Failed to write request to log file:', err.message);
+          }
         }
 
         const response = await googleMapsClient.placesNearby({
@@ -340,24 +345,26 @@ export async function searchPlaces({ latitude, longitude, radius, minRating, min
 
         // File: Log only place names and ranks
         const places = response.data.results || [];
-        try {
-          let logBatch = '';
-          places.forEach((place, index) => {
-            const rank = allPlaces.length + index + 1;
-            const rating = place.rating || 'N/A';
-            const reviews = place.user_ratings_total || 0;
-            logBatch += `${rank}\t${rating}\t${reviews}\t${place.name}\n`;
-          });
+        if (logPath) {
+          try {
+            let logBatch = '';
+            places.forEach((place, index) => {
+              const rank = allPlaces.length + index + 1;
+              const rating = place.rating || 'N/A';
+              const reviews = place.user_ratings_total || 0;
+              logBatch += `${rank}\t${rating}\t${reviews}\t${place.name}\n`;
+            });
 
-          // Log next_page_token info after each page
-          logBatch += `\nRESPONSE (${placeType} page ${pageCount + 1}):\n` +
-            `  Status: ${response.data.status}\n` +
-            `  Results this page: ${places.length}\n` +
-            `  next_page_token exists: ${!!response.data.next_page_token}\n` +
-            `  next_page_token value: ${response.data.next_page_token || 'NONE'}\n\n`;
-          await appendFile(logPath, logBatch);
-        } catch (err) {
-          console.error('Failed to write to log file:', err.message);
+            // Log next_page_token info after each page
+            logBatch += `\nRESPONSE (${placeType} page ${pageCount + 1}):\n` +
+              `  Status: ${response.data.status}\n` +
+              `  Results this page: ${places.length}\n` +
+              `  next_page_token exists: ${!!response.data.next_page_token}\n` +
+              `  next_page_token value: ${response.data.next_page_token || 'NONE'}\n\n`;
+            await appendFile(logPath, logBatch);
+          } catch (err) {
+            console.error('Failed to write to log file:', err.message);
+          }
         }
 
         if (response.data.status !== 'OK' && response.data.status !== 'ZERO_RESULTS') {
