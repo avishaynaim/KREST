@@ -1,0 +1,9 @@
+[Desktop Entry]
+Version=1.0
+Type=Application
+Name=KREST Server
+Comment=Start KREST Places API server
+Icon=web-browser
+Exec=sh -c "cd $HOME/KREST && ./krest-launch.sh"
+Terminal=true
+Categories=Utility;Application;

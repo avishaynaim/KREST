@@ -10,6 +10,7 @@ export const config = {
   // In development: from .env file or environment variable
   // This is made optional here and will be validated when actually used
   googlePlacesApiKey: process.env.GOOGLE_PLACES_API_KEY || null,
+  googlePlacesApiKeyBackup: process.env.GOOGLE_PLACES_API_KEY_BACKUP || null,
 
   // OpenRouter API Key for kosher info
   openRouterApiKey: process.env.OPENROUTER_API_KEY || null,
@@ -42,5 +43,13 @@ export function initializeConfigWithApiKey(apiKey) {
  * @returns {boolean} True if API key is available
  */
 export function isConfigInitialized() {
-  return config.googlePlacesApiKey !== null && config.googlePlacesApiKey !== '';
+  return (config.googlePlacesApiKey !== null && config.googlePlacesApiKey !== '');
+}
+
+/** Get all available Google Places API keys (primary + backup) */
+export function getAvailableApiKeys() {
+  const keys = [];
+  if (config.googlePlacesApiKey) keys.push(config.googlePlacesApiKey);
+  if (config.googlePlacesApiKeyBackup) keys.push(config.googlePlacesApiKeyBackup);
+  return keys;
 }

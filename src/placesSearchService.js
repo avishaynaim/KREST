@@ -1,18 +1,11 @@
-import { googleMapsClient, apiKey } from './placesClient.js';
+import { searchNearby } from './placesClient.js';
 import { config } from './config.js';
 import { appendFile, writeFile } from 'fs/promises';
 import { join } from 'path';
 import { calculateDistance } from './geoUtils.js';
 
-// Re-export for consumers
 export { calculateDistance };
 
-/**
- * Format opening hours from periods array to 24-hour format strings
- * Old API periods format: { open: { day: 0, time: "0900" }, close: { day: 0, time: "1700" } }
- * @param {Object} openingHours - opening_hours object from Places API
- * @returns {Array<string>} Array of formatted strings like "Sunday: 09:00 – 17:00"
- */
 function formatPeriodsTo24Hour(openingHours) {
   if (!openingHours?.periods) {
     // Fallback to weekday_text if no periods available
@@ -64,6 +57,7 @@ function formatPeriodsTo24Hour(openingHours) {
  * @param {Object} openingHours - Opening hours object from Place Details API
  * @returns {boolean} True if closed during business hours on Saturday, false otherwise
  */
+
 export function isClosedOnSaturday(openingHours) {
   // If no opening hours data, INCLUDE the place (might be closed on Saturday)
   if (!openingHours || !openingHours.weekday_text) {
@@ -148,46 +142,62 @@ export function isClosedOnSaturday(openingHours) {
  * @param {number} timeout - Timeout in milliseconds (default: 10000)
  * @returns {Promise<Object>} Place details
  */
-export async function getPlaceDetails(placeId, timeout = 10000) {
-  try {
-    const response = await googleMapsClient.placeDetails({
-      params: {
-        place_id: placeId,
-        fields: ['name', 'formatted_address', 'geometry', 'rating', 'user_ratings_total',
-                 'opening_hours', 'formatted_phone_number', 'photos', 'place_id', 'url'],
-        language: 'he',
-        key: apiKey,
-      },
-      timeout,
-    });
 
-    // No logging for place details - only log the initial places from nearby search
+/**
+ * Convert Places API v1 place object to legacy format
+ */
+function convertNewPlaceToLegacy(newPlace, searchLatLng) {
+  const lat = newPlace.location?.latitude || 0;
+  const lng = newPlace.location?.longitude || 0;
 
-    if (response.data.status === 'OK') {
-      return response.data.result;
-    }
+  const name = newPlace.displayName?.text || newPlace.name || 'Unknown';
+  const placeId = newPlace.id?.replace('places/', '') || newPlace.place_id || newPlace.id;
 
-    return null;
-  } catch (error) {
-    if (error.code === 'ECONNABORTED' || error.message.includes('timeout')) {
-      throw new Error('Request timeout - Google API did not respond within 10 seconds');
-    }
-    console.error(`Error fetching details for place ${placeId}:`, error.message);
-    return null;
+  const geometry = { location: { lat, lng } };
+
+  let openingHours = {};
+  if (newPlace.currentOpeningHours || newPlace.regularOpeningHours) {
+    const src = newPlace.currentOpeningHours || newPlace.regularOpeningHours;
+    openingHours = { weekday_text: formatPeriodsTo24Hour(src) };
   }
+
+  let url;
+  if (newPlace.googleMapsUri) {
+    url = `${newPlace.googleMapsUri}${newPlace.googleMapsUri.includes('?') ? '&' : '?'}hl=he`;
+  } else {
+    const pid = placeId || '';
+    url = `https://www.google.com/maps/place/?q=place_id:${pid}&hl=he`;
+  }
+
+  return {
+    place_id: placeId,
+    name,
+    geometry,
+    rating: newPlace.rating || 0,
+    user_ratings_total: newPlace.userRatingCount || 0,
+    opening_hours: openingHours,
+    url,
+    types: newPlace.types || [],
+    primaryType: newPlace.primaryType,
+    businessStatus: newPlace.businessStatus,
+    formatted_address: newPlace.formattedAddress,
+    editorialSummary: newPlace.editorialSummary?.text || null,
+    formatted_phone_number: newPlace.internationalPhoneNumber || null,
+    photos: newPlace.photos ? newPlace.photos.map(p => ({
+      reference: p.name,
+      width: p.width,
+      height: p.height,
+    })) : [],
+    website: newPlace.websiteUri || null,
+  };
 }
 
 /**
- * Formats a place object for API response
- * @param {Object} place - Place details from Google API
- * @param {number} searchLat - Search location latitude
- * @param {number} searchLng - Search location longitude
- * @returns {Object} Formatted place object
+ * Format legacy place for UI response
  */
-export function formatPlace(place, searchLat, searchLng) {
+function formatPlace(place, searchLat, searchLng) {
   const distance = calculateDistance(
-    searchLat,
-    searchLng,
+    searchLat, searchLng,
     place.geometry.location.lat,
     place.geometry.location.lng
   );
@@ -201,14 +211,10 @@ export function formatPlace(place, searchLat, searchLng) {
     },
     rating: place.rating || 0,
     reviewCount: place.user_ratings_total || 0,
-    distance: distance,
+    distance,
     openingHours: formatPeriodsTo24Hour(place.opening_hours),
     phone: place.formatted_phone_number || null,
-    photos: place.photos?.map(photo => ({
-      reference: photo.photo_reference,
-      width: photo.width,
-      height: photo.height,
-    })) || [],
+    photos: place.photos || [],
     googleMapsUrl: place.url
       ? `${place.url}${place.url.includes('?') ? '&' : '?'}hl=he`
       : `https://www.google.com/maps/place/?q=place_id:${place.place_id}&hl=he`,
@@ -217,20 +223,9 @@ export function formatPlace(place, searchLat, searchLng) {
 }
 
 /**
- * Searches for restaurants and cafes
- * @param {Object} params - Search parameters
- * @param {number} params.latitude - Search location latitude
- * @param {number} params.longitude - Search location longitude
- * @param {number} params.radius - Search radius in kilometers (default: 20)
- * @param {number} params.minRating - Minimum rating filter (default: 3.0)
- * @param {number} params.minReviews - Minimum review count filter (default: 20)
- * @param {string} params.type - Place type: "restaurant", "cafe", or undefined for both (default: both)
- * @param {boolean} params.closedSaturday - Filter for places closed on Saturday (default: true)
- * @param {boolean} params.opennow - Filter for places open now (optional)
- * @returns {Promise<Array>} Filtered and sorted places
+ * Main search function
  */
 export async function searchPlaces({ latitude, longitude, radius, minRating, minReviews, type, closedSaturday = true, opennow }) {
-  // Apply defaults
   const searchRadius = radius || config.defaultRadius;
   const minRatingFilter = minRating !== undefined ? minRating : config.defaultMinRating;
   const minReviewsFilter = minReviews !== undefined ? minReviews : config.defaultMinReviews;
@@ -246,7 +241,6 @@ export async function searchPlaces({ latitude, longitude, radius, minRating, min
   console.log(`Open Now: ${opennow !== undefined ? opennow : 'not set'}`);
   console.log('========================\n');
 
-  // Debug log file (only in development - avoids disk I/O in production)
   const isProduction = process.env.NODE_ENV === 'production';
   const logPath = isProduction ? null : join(process.cwd(), 'google-api-debug.log');
   if (logPath) {
@@ -264,274 +258,136 @@ export async function searchPlaces({ latitude, longitude, radius, minRating, min
     }
   }
 
-  // Validate radius
   if (searchRadius > config.maxRadius) {
     throw new Error(`Radius cannot exceed ${config.maxRadius} km`);
   }
 
-  // Determine place types for API query
   let placeTypes = [];
   if (type === 'restaurant') {
     placeTypes = ['restaurant'];
   } else if (type === 'cafe') {
     placeTypes = ['cafe'];
   } else {
-    // Search both separately to get more results (60 each = 120 total)
     placeTypes = ['restaurant', 'cafe'];
   }
 
-  // Convert radius from km to meters for Google API
   const radiusMeters = searchRadius * 1000;
 
   try {
-    // Search for each place type separately with pagination
     let allPlaces = [];
-
-    // GOOGLE PLACES API PAGINATION:
-    // - Each request returns max 20 results
-    // - next_page_token allows fetching more results
-    // - Must wait 2-3 seconds between page requests (or get INVALID_REQUEST)
-    // - Tokens are search-specific, short-lived, one-time use only
-    // - Google typically limits to ~60 results (3 pages) but we'll fetch ALL available
 
     for (const placeType of placeTypes) {
       let nextPageToken = null;
       let pageCount = 0;
 
       console.log(`\n--- Searching for type: ${placeType} ---`);
-      console.log(`📄 Will fetch ALL pages until Google stops providing next_page_token`);
 
       do {
-        // CRITICAL: Must wait 2-3 seconds before using next_page_token
-        // Calling immediately → INVALID_REQUEST error
         if (nextPageToken) {
-          console.log(`⏱️  Waiting 3 seconds before fetching next page (Google requirement)...`);
+          console.log(`⏱️  Waiting 3 seconds before fetching next page...`);
           await new Promise(resolve => setTimeout(resolve, 3000));
         }
 
-        const requestParams = {
-          location: { lat: latitude, lng: longitude },
+        console.log(`>>> GOOGLE PLACES SEARCH NEARBY (${placeType} page ${pageCount + 1})`);
+
+        const response = await searchNearby({
+          latitude,
+          longitude,
           radius: radiusMeters,
-          type: placeType,
-          language: 'he',
-          key: apiKey,
-          ...(nextPageToken && { pagetoken: nextPageToken }),
-          ...(opennow !== undefined && { opennow: opennow }),
-        };
-
-        console.log(`\n>>> GOOGLE PLACES NEARBY API REQUEST (${placeType} page ${pageCount + 1}) <<<`);
-        console.log(`  ALL PARAMETERS SENT TO GOOGLE:`);
-        const paramsForLog = { ...requestParams, key: '***hidden***' };
-        console.log(JSON.stringify(paramsForLog, null, 2));
-
-        // Also write request params to log file (dev only)
-        if (logPath) {
-          try {
-            const requestLog = `REQUEST (${placeType} page ${pageCount + 1}):\n${JSON.stringify(paramsForLog, null, 2)}\n\n`;
-            await appendFile(logPath, requestLog);
-          } catch (err) {
-            console.error('Failed to write request to log file:', err.message);
-          }
-        }
-
-        const response = await googleMapsClient.placesNearby({
-          params: requestParams,
-          timeout: 10000, // 10-second timeout
+          types: [placeType],
+          openNow: opennow,
         });
 
-        // Console: Log response status only
-        console.log(`  <<< Response status: ${response.data.status} >>>`);
-        console.log(`  <<< Results count: ${response.data.results?.length || 0} >>>`);
+        console.log(`  Status: ${response.status}, Results: ${response.places.length}`);
 
-        // File: Log only place names and ranks
-        const places = response.data.results || [];
         if (logPath) {
           try {
-            let logBatch = '';
-            places.forEach((place, index) => {
-              const rank = allPlaces.length + index + 1;
-              const rating = place.rating || 'N/A';
-              const reviews = place.user_ratings_total || 0;
-              logBatch += `${rank}\t${rating}\t${reviews}\t${place.name}\n`;
-            });
-
-            // Log next_page_token info after each page
-            logBatch += `\nRESPONSE (${placeType} page ${pageCount + 1}):\n` +
-              `  Status: ${response.data.status}\n` +
-              `  Results this page: ${places.length}\n` +
-              `  next_page_token exists: ${!!response.data.next_page_token}\n` +
-              `  next_page_token value: ${response.data.next_page_token || 'NONE'}\n\n`;
-            await appendFile(logPath, logBatch);
-          } catch (err) {
-            console.error('Failed to write to log file:', err.message);
-          }
+            await appendFile(logPath, `PAGE ${pageCount+1}: ${response.places.length} places, token: ${response.nextPageToken || 'none'}\n`);
+          } catch {}
         }
 
-        if (response.data.status !== 'OK' && response.data.status !== 'ZERO_RESULTS') {
-          console.error(`  ERROR: ${response.data.status} - ${response.data.error_message || 'No error message'}`);
-          throw new Error(`Places search failed: ${response.data.status}`);
+        if (response.status !== 'OK' && response.status !== 'ZERO_RESULTS') {
+          throw new Error(`Places search failed: ${response.status}`);
         }
 
-        const resultsThisPage = response.data.results || [];
-        allPlaces = allPlaces.concat(resultsThisPage);
-        nextPageToken = response.data.next_page_token;
+        const legacy = response.places.map(p => convertNewPlaceToLegacy(p, { latitude, longitude }));
+        allPlaces = allPlaces.concat(legacy);
+        nextPageToken = response.nextPageToken;
         pageCount++;
 
-        console.log(`  ✓ Fetched ${resultsThisPage.length} places`);
-        console.log(`  📊 Total accumulated: ${allPlaces.length} places`);
-        console.log(`  🔗 next_page_token exists: ${!!nextPageToken}`);
+        console.log(`  ✓ Total accumulated: ${allPlaces.length} places`);
+      } while (nextPageToken);
 
-        if (!nextPageToken) {
-          console.log(`  ✅ PAGINATION COMPLETE - Google has no more results`);
-        } else {
-          console.log(`  ➡️  Continuing to next page...`);
-        }
-
-      } while (nextPageToken); // Keep going until Google stops providing next_page_token
-
-      const typeCount = allPlaces.filter(p => p.types?.includes(placeType)).length;
-      console.log(`\n>>> ✅ Completed ${placeType}: ${typeCount} places across ${pageCount} page(s)`);
+      console.log(`✅ Completed ${placeType}: ${allPlaces.length} total places, ${pageCount} page(s)`);
     }
 
     if (allPlaces.length === 0) {
       return [];
     }
 
-    // Remove duplicates based on place_id (same place may appear in both restaurant and cafe)
-    const uniquePlacesMap = new Map();
-    allPlaces.forEach(place => {
-      if (!uniquePlacesMap.has(place.place_id)) {
-        uniquePlacesMap.set(place.place_id, place);
+    // Deduplicate
+    const uniqueMap = new Map();
+    allPlaces.forEach(p => {
+      if (!uniqueMap.has(p.place_id)) {
+        uniqueMap.set(p.place_id, p);
       }
     });
-    const places = Array.from(uniquePlacesMap.values());
+    const uniquePlaces = Array.from(uniqueMap.values());
+    console.log(`\nUnique places after dedup: ${uniquePlaces.length}`);
 
-    console.log(`\n=== FETCHING PLACE DETAILS ===`);
-    console.log(`Found ${allPlaces.length} total places (${places.length} unique)`);
-    console.log(`Fetching details for ${places.length} places...`);
+    console.log('=== FILTERING PLACES ===');
+    let filtSat = 0, filtRating = 0, filtReviews = 0;
 
-    // Fetch details for each place to get opening hours
-    const placesWithDetails = [];
-    let detailsFailed = 0;
+    const filtered = uniquePlaces.filter((place, idx) => {
+      const name = place.name || 'Unknown';
 
-    for (let i = 0; i < places.length; i++) {
-      const place = places[i];
-      try {
-        if (i % 10 === 0) {
-          console.log(`  Progress: ${i}/${places.length} details fetched...`);
-        }
-        const details = await getPlaceDetails(place.place_id);
-        if (details) {
-          placesWithDetails.push(details);
-        } else {
-          detailsFailed++;
-        }
-      } catch (error) {
-        console.error(`  Failed to get details for ${place.name}: ${error.message}`);
-        detailsFailed++;
-      }
-    }
-
-    console.log(`✓ Successfully fetched details for ${placesWithDetails.length} places`);
-    console.log(`✗ Failed to fetch details for ${detailsFailed} places`);
-
-    console.log('\n=== FILTERING PLACES ===');
-
-    // Filter places
-    let filteredBySaturday = 0;
-    let filteredByRating = 0;
-    let filteredByReviews = 0;
-
-    const filteredPlaces = placesWithDetails.filter((place, index) => {
-      const placeName = place.name || 'Unknown';
-
-      // Check Saturday closure (only if filter is enabled)
       if (filterClosedSaturday) {
-        const isClosed = isClosedOnSaturday(place.opening_hours);
-        const saturdayHours = place.opening_hours?.weekday_text?.[6] || 'No data'; // Saturday is index 6
-
-        if (!isClosed) {
-          filteredBySaturday++;
-          if (index < 5) {
-            console.log(`❌ [${placeName}] - OPEN on Saturday: "${saturdayHours}"`);
-          }
+        const closed = isClosedOnSaturday(place.opening_hours);
+        const satHours = place.opening_hours?.weekday_text?.[6] || 'No data';
+        if (!closed) {
+          filtSat++;
+          if (idx < 5) console.log(`❌ ${name} - OPEN Sat: "${satHours}"`);
           return false;
-        } else {
-          if (index < 5) {
-            console.log(`✅ [${placeName}] - Closed on Saturday: "${saturdayHours}"`);
-          }
         }
       }
 
-      // Check minimum rating
       const rating = place.rating || 0;
       if (rating < minRatingFilter) {
-        filteredByRating++;
-        if (index < 5) {
-          console.log(`❌ [${placeName}] - Rating too low: ${rating} < ${minRatingFilter}`);
-        }
+        filtRating++;
+        if (idx < 5) console.log(`❌ ${name} - Low rating: ${rating} < ${minRatingFilter}`);
         return false;
       }
 
-      // Check minimum review count
-      const reviewCount = place.user_ratings_total || 0;
-      if (reviewCount < minReviewsFilter) {
-        filteredByReviews++;
-        if (index < 5) {
-          console.log(`❌ [${placeName}] - Not enough reviews: ${reviewCount} < ${minReviewsFilter}`);
-        }
+      const reviews = place.user_ratings_total || 0;
+      if (reviews < minReviewsFilter) {
+        filtReviews++;
+        if (idx < 5) console.log(`❌ ${name} - Few reviews: ${reviews} < ${minReviewsFilter}`);
         return false;
       }
 
-      if (index < 5) {
-        console.log(`✅ [${placeName}] - PASSED all filters (Rating: ${rating}, Reviews: ${reviewCount})`);
-      }
+      if (idx < 5) console.log(`✅ ${name} - passed`);
       return true;
     });
 
-    console.log('\n=== FILTER SUMMARY ===');
-    console.log(`Total places fetched: ${placesWithDetails.length}`);
-    console.log(`Filtered by Saturday: ${filteredBySaturday}`);
-    console.log(`Filtered by Rating: ${filteredByRating}`);
-    console.log(`Filtered by Reviews: ${filteredByReviews}`);
-    console.log(`Final result count: ${filteredPlaces.length}`);
-    console.log('======================\n');
+    console.log('=== FILTER SUMMARY ===');
+    console.log(`Total: ${uniquePlaces.length}, Sat: ${filtSat}, Rating: ${filtRating}, Reviews: ${filtReviews}`);
+    console.log(`Results: ${filtered.length}`);
 
-    // Format places and add distance
-    const formattedPlaces = filteredPlaces.map(place =>
-      formatPlace(place, latitude, longitude)
-    );
+    // Format and sort
+    const formatted = filtered.map(p => formatPlace(p, latitude, longitude));
+    formatted.sort((a, b) => b.rating - a.rating || b.reviewCount - a.reviewCount);
 
-    // Sort by rating (highest first), then by review count as tiebreaker
-    formattedPlaces.sort((a, b) => {
-      if (b.rating !== a.rating) {
-        return b.rating - a.rating;
-      }
-      return b.reviewCount - a.reviewCount;
-    });
-
-    console.log(`Returning ${formattedPlaces.length} places after sorting`);
-
-    return formattedPlaces;
+    console.log(`Returning ${formatted.length} places`);
+    return formatted;
   } catch (error) {
-    // Re-throw specific errors
-    if (error.message.includes('Radius cannot exceed')) {
-      throw error;
-    }
-    if (error.message.includes('timeout')) {
-      throw error;
-    }
-
-    // Check for rate limit errors
+    if (error.message.includes('Radius')) throw error;
+    if (error.message.includes('timeout')) throw error;
     if (error.response?.status === 429 || error.message.includes('OVER_QUERY_LIMIT')) {
       throw new Error('RATE_LIMIT_EXCEEDED: Google API rate limit exceeded');
     }
-
-    // Check for API key errors
     if (error.response?.status === 403 || error.message.includes('API key')) {
       throw new Error('GOOGLE_API_ERROR: Invalid or missing API key');
     }
-
     throw new Error(`Places search error: ${error.message}`);
   }
 }

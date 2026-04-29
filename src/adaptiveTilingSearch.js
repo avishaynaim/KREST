@@ -154,9 +154,11 @@ async function searchTileNearby(tile, includedTypes, apiKey) {
         'X-Goog-Api-Key': apiKey,
         'X-Goog-FieldMask': 'places.id,places.displayName,places.primaryType,places.location,places.formattedAddress,places.rating,places.userRatingCount,places.businessStatus,places.currentOpeningHours,places.regularOpeningHours,places.googleMapsUri',
         'Content-Type': 'application/json',
+        'Accept-Language': 'he',
       },
       timeout: ADAPTIVE_TILING_CONFIG.API_TIMEOUT,
     });
+
 
     return {
       places: response.data?.places || [],
@@ -232,6 +234,7 @@ export async function adaptiveTilingSearch(lat, lng, radiusMeters, includedTypes
     let duplicates = 0;
 
     for (const place of places) {
+
       const placeId = place.id; // e.g., "places/ChIJ..."
 
       if (seenPlaces.has(placeId)) {
@@ -316,6 +319,7 @@ export async function adaptiveTilingSearch(lat, lng, radiusMeters, includedTypes
  * Converts New API places to old format for compatibility
  */
 export function convertNewPlaceToOldFormat(newPlace, searchLat, searchLng) {
+
   const lat = newPlace.location?.latitude || 0;
   const lng = newPlace.location?.longitude || 0;
 

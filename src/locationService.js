@@ -1,4 +1,4 @@
-import { googleMapsClient, apiKey } from './placesClient.js';
+import { geocode } from './placesClient.js';
 
 /**
  * Validates coordinate ranges
@@ -24,39 +24,7 @@ export function validateCoordinates(latitude, longitude) {
  * @throws {Error} - If geocoding fails
  */
 export async function geocodeCity(cityName) {
-  try {
-    const response = await googleMapsClient.geocode({
-      params: {
-        address: cityName,
-        language: 'he',
-        key: apiKey,
-      },
-    });
-
-    // Console: Log request details only
-    console.log('\n>>> GOOGLE GEOCODING API REQUEST <<<');
-    console.log(`City: ${cityName}`);
-    console.log(`Language: he`);
-    console.log(`Status: ${response.data.status}`);
-
-    if (response.data.status === 'OK' && response.data.results.length > 0) {
-      const result = response.data.results[0];
-      return {
-        latitude: result.geometry.location.lat,
-        longitude: result.geometry.location.lng,
-        formattedAddress: result.formatted_address,
-      };
-    } else if (response.data.status === 'ZERO_RESULTS') {
-      throw new Error(`City not found: ${cityName}`);
-    } else {
-      throw new Error(`Geocoding failed: ${response.data.status}`);
-    }
-  } catch (error) {
-    if (error.message.includes('City not found') || error.message.includes('Geocoding failed')) {
-      throw error;
-    }
-    throw new Error(`Geocoding error: ${error.message}`);
-  }
+  return await geocode(cityName);
 }
 
 /**
@@ -69,22 +37,17 @@ export async function geocodeCity(cityName) {
  * @throws {Error} - If location validation fails
  */
 export async function processLocation({ city, latitude, longitude }) {
-  // Check if coordinates are provided
   const hasCoordinates = latitude !== undefined && longitude !== undefined;
   const hasCity = city && city.trim().length > 0;
 
-  // Validation: at least one input method required
   if (!hasCoordinates && !hasCity) {
     throw new Error('Either city name or coordinates must be provided');
   }
 
-  // Precedence: coordinates override city name
   if (hasCoordinates) {
-    // Validate coordinate ranges
     if (!validateCoordinates(latitude, longitude)) {
       throw new Error('Invalid coordinates. Latitude must be between -90 and 90, longitude must be between -180 and 180');
     }
-
     return {
       latitude: parseFloat(latitude),
       longitude: parseFloat(longitude),
@@ -92,7 +55,6 @@ export async function processLocation({ city, latitude, longitude }) {
     };
   }
 
-  // If only city name provided, geocode it
   if (hasCity) {
     return await geocodeCity(city);
   }
