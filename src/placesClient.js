@@ -52,8 +52,13 @@ async function executeWithRetry(options, maxRetries = 4) {
 
     console.log(`[placesClient] Using API key index ${keyIndex} (${apiKey.substring(0, 8)}...)`);
 
-    // Inject the key into request headers/params
+    // Inject the key into request headers/params.
+    // The legacy Geocoding REST API (maps.googleapis.com) ignores X-Goog-Api-Key
+    // and requires the key as a query param, unlike the newer Places API.
     const requestOptions = { ...options };
+    if (requestOptions.params) {
+      requestOptions.params = { ...requestOptions.params, key: apiKey };
+    }
     if (requestOptions.headers) {
       requestOptions.headers = { ...requestOptions.headers, 'X-Goog-Api-Key': apiKey };
     } else {
@@ -126,6 +131,7 @@ export async function searchNearby({ latitude, longitude, radius, types, openNow
       headers: {
         'Content-Type': 'application/json',
         'Accept-Language': 'he',
+        'X-Goog-FieldMask': 'places.id,places.displayName,places.primaryType,places.types,places.location,places.formattedAddress,places.rating,places.userRatingCount,places.businessStatus,places.currentOpeningHours,places.regularOpeningHours,places.googleMapsUri,places.editorialSummary,places.internationalPhoneNumber,places.photos,places.websiteUri',
       },
       timeout: 15000, // 15s timeout
     });
@@ -183,7 +189,7 @@ export async function geocode(address) {
       params: {
         address,
         language: 'he',
-        // key injected by executeWithRetry via X-Goog-Api-Key header
+        // key injected by executeWithRetry into params.key
       },
       headers: {
         'Accept-Language': 'he',
