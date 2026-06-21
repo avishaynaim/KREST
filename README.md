@@ -1,3 +1,13 @@
+---
+title: KREST
+emoji: 🕯️
+colorFrom: blue
+colorTo: green
+sdk: docker
+app_port: 7860
+pinned: false
+---
+
 # Places API - Find Computer-Friendly Cafes Closed on Saturday
 
 API service for finding restaurants and cafes that are closed on Saturday (kosher/halal establishments) - ideal for finding quiet workspaces on weekends.
